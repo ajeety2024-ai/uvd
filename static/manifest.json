@@ -1,0 +1,32 @@
+{
+  "id": "/",
+  "name": "UVD - Universal Video Downloader",
+  "short_name": "UVD",
+  "description": "Universal Video Downloader by Ajeet Yadav - Download videos & audio from YouTube, Instagram, Facebook, TikTok, Twitter, Reddit & more.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

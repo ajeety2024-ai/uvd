@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>UVD - Universal Video Downloader</title>
+  
+  <!-- App Icons & Favicon -->
+  <link rel="icon" type="image/png" href="/icon.png">
+  <link rel="shortcut icon" href="/favicon.ico">
+  <link rel="apple-touch-icon" href="/icon.png">
+
+  <!-- PWA meta tags -->
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#6366f1">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary: '#6366f1',
+            accent: '#ec4899',
+            darkBg: '#090d16',
+            darkCard: '#111827',
+          }
+        }
+      }
+    }
+  </script>
+  
+  <!-- Service Worker Registration for PWA & Instant Updates -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function() {
+        navigator.serviceWorker.register('/sw.js').catch(function(err) {
+          console.log('SW info:', err);
+        });
+      });
+    }
+  </script>
+  <!-- Lucide Icons (Local bundle) -->
+  <script src="/js/lucide.min.js"></script>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="bg-[#090d16] text-slate-100 min-h-screen flex flex-col selection:bg-indigo-500 selection:text-white pb-14 sm:pb-8">
+
+  <!-- PWA Install Banner -->
+  <div id="pwaInstallBanner" class="hidden bg-gradient-to-r from-indigo-900/90 to-purple-900/90 border-b border-indigo-500/30 px-4 py-2.5 text-xs text-slate-200 flex items-center justify-between z-50">
+    <div class="flex items-center space-x-2">
+      <img src="/icon.png" class="w-5 h-5 rounded-md">
+      <span>Install <b>UVD</b> on your device for 1-tap fast access!</span>
+    </div>
+    <button id="pwaInstallBtn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold px-3 py-1 rounded-lg text-xs transition-all shadow-sm">
+      Install App
+    </button>
+  </div>
+
+  <!-- Header / Navigation -->
+  <header class="border-b border-slate-800 bg-[#0c1220] sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand Logo (UVD) -->
+      <div class="flex items-center space-x-3">
+        <div class="relative flex-shrink-0">
+          <img src="/icon.png" onerror="this.onerror=null; this.src='/favicon.ico';" alt="UVD" class="w-10 h-10 rounded-2xl shadow-lg shadow-indigo-500/30 border border-white/20 object-cover">
+          <span class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-900 rounded-full"></span>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <span class="font-black text-xl sm:text-2xl tracking-tight bg-gradient-to-r from-indigo-400 via-purple-300 to-pink-400 bg-clip-text text-transparent">
+              UVD
+            </span>
+            <span class="px-2 py-0.5 text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-full">
+              PRO
+            </span>
+          </div>
+          <div class="text-[10px] text-slate-400 font-medium tracking-wide">
+            Universal Video Downloader
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Nav Status, Theme Switch & Actions -->
+      <div class="flex items-center space-x-2 sm:space-x-3">
+        <!-- Trial / User Account Badge with Upgrade CTA -->
+        <button id="authNavBtn" type="button" class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 text-slate-200 transition-all flex items-center space-x-2 cursor-pointer shadow-sm group" title="Account / Trial Status">
+          <span id="authNavDot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span id="authNavText" class="text-xs font-semibold">Trial: 7d left</span>
+          <span id="authNavUpgradeTag" class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-sm group-hover:scale-105 transition-transform">Upgrade</span>
+        </button>
+
+        <!-- Theme Toggle (Icon-only Sun/Moon) -->
+        <button id="themeToggleBtn" class="w-9 h-9 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 text-slate-300 hover:text-white transition-all flex items-center justify-center cursor-pointer shadow-sm" title="Switch Theme (Light / Dark)">
+          <i id="themeIcon" data-lucide="sun" class="w-4 h-4 text-amber-400"></i>
+          <span id="themeLabel" class="hidden">Light</span>
+        </button>
+
+        <!-- New Update Available Notification Pill Button -->
+        <button id="navUpdateBadge" type="button" class="hidden px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 via-pink-500/20 to-purple-500/20 hover:from-amber-500/30 hover:to-purple-500/30 border border-amber-500/40 text-amber-300 font-bold text-xs flex items-center space-x-1.5 cursor-pointer shadow-md transition-all" title="New Update Available!">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span>Update</span>
+          <span id="navUpdateVersionTag" class="px-1.5 py-0.2 bg-amber-500 text-slate-950 text-[9px] font-black rounded-md">v2.2</span>
+        </button>
+
+        <!-- Settings Button (Desktop / Laptop View) -->
+        <button id="openSettingsBtn" type="button" onclick="if (window.openSettings) { window.openSettings(); } else { const m = document.getElementById('settingsModal'); if (m) { m.classList.remove('hidden'); m.classList.add('open'); m.style.setProperty('display', 'flex', 'important'); } }" class="hidden sm:flex p-2 sm:px-3 sm:py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 text-slate-300 hover:text-white transition-all items-center space-x-1.5 cursor-pointer" title="Settings & Preferences">
+          <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <span class="text-xs font-semibold hidden sm:inline">Settings</span>
+        </button>
+
+        <!-- Unified Downloads & Live Manager Tab with Count Badge (Desktop / Laptop View) -->
+        <button id="unifiedDownloadsNavBtn" class="hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 text-slate-200 hover:text-white transition-all font-semibold text-xs cursor-pointer shadow-sm" title="View Downloads & Active Queue">
+          <i data-lucide="download" class="w-4 h-4 text-indigo-400"></i>
+          <span>Downloads</span>
+          <span id="navDownloadsCountBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">0</span>
+        </button>
+
+        <!-- Legacy Hook Anchors (Hidden) -->
+        <button id="navOpenManagerBtn" class="hidden"></button>
+        <button id="openFolderBtn" class="hidden"></button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Trial Expired Warning Alert Ribbon (shown when 7-day trial expires and no user is logged in) -->
+  <div id="trialExpiredBanner" class="hidden bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 text-white px-4 py-2.5 text-xs sm:text-sm font-semibold flex items-center justify-between shadow-lg sticky top-16 z-30">
+    <div class="flex items-center space-x-2">
+      <svg class="w-4 h-4 flex-shrink-0 text-amber-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+      <span><b>Free Trial Expired!</b> Your 7-day free trial has completed. Please create a free account or sign in to continue downloading videos and playlists.</span>
+    </div>
+    <button id="trialBannerCreateBtn" type="button" class="px-3 py-1 bg-white hover:bg-slate-100 text-rose-700 font-bold rounded-lg text-xs shadow-md cursor-pointer transition-all ml-2 flex-shrink-0">
+      Create Account
+    </button>
+  </div>
+
+  <!-- Main Container -->
+  <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-6 sm:pt-8">
+
+    <!-- Hero Section -->
+    <div class="text-center max-w-2xl mx-auto mb-6">
+      <h1 class="hero-title text-2xl sm:text-4xl sm:leading-tight font-extrabold tracking-tight mb-2">
+        <span class="block sm:inline">Universal Video & Playlist</span> 
+        <br class="hidden sm:inline" />
+        <span class="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
+          High-Speed Downloader
+        </span>
+      </h1>
+    </div>
+
+    <!-- Main Input Box (Search Bar) -->
+    <div class="max-w-3xl mx-auto mb-6">
+      <div class="glass-panel p-2 sm:p-3 rounded-2xl sm:rounded-3xl shadow-2xl relative">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          
+          <!-- URL Input Field -->
+          <div class="relative flex-grow flex items-center">
+            <div class="absolute left-3 sm:left-4 text-slate-400 pointer-events-none">
+              <i data-lucide="link" class="w-5 h-5 text-indigo-400"></i>
+            </div>
+            <input 
+              type="text" 
+              id="urlInput"
+              placeholder="Paste single video link or Playlist link here..."
+              class="w-full pl-10 sm:pl-12 pr-20 py-3.5 sm:py-4 bg-slate-900/90 border border-slate-700/60 rounded-xl sm:rounded-2xl text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 transition-all font-medium"
+              autocomplete="off"
+            />
+            
+            <div class="absolute right-2.5 flex items-center space-x-1">
+              <button id="clearBtn" class="p-1.5 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition-all" title="Clear">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+              <button id="pasteBtn" class="px-2.5 py-1 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-indigo-500/20 rounded-lg transition-all flex items-center space-x-1" title="Paste from Clipboard">
+                <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+                <span class="hidden sm:inline">Paste</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Fetch Button -->
+          <button 
+            id="fetchBtn"
+            class="btn-primary py-3.5 sm:py-4 px-6 sm:px-8 rounded-xl sm:rounded-2xl text-white font-bold text-sm sm:text-base flex items-center justify-center space-x-2 flex-shrink-0 cursor-pointer"
+          >
+            <i data-lucide="sparkles" class="w-5 h-5"></i>
+            <span>Fetch Media</span>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- Default Format Toggle (Quick Switcher) -->
+      <div class="flex items-center justify-center mt-3.5 mb-3">
+        <div class="inline-flex p-1 rounded-2xl bg-slate-900 border border-slate-700/60 shadow-lg" id="quickFormatSegmented">
+          <button id="quickFormatVideoBtn" type="button" class="px-4 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md cursor-pointer">
+            <i data-lucide="video" class="w-3.5 h-3.5"></i>
+            <span>MP4 Video (Best)</span>
+          </button>
+          <button id="quickFormatAudioBtn" type="button" class="px-4 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center space-x-1.5 text-slate-400 hover:text-slate-200 cursor-pointer">
+            <i data-lucide="music" class="w-3.5 h-3.5"></i>
+            <span>MP3 Audio</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Supported Platform Glassmorphic SVG Chips -->
+      <div class="flex flex-wrap items-center justify-center gap-2 px-2">
+        <button class="platform-chip platform-quick-btn px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/50 hover:border-red-500/40 text-slate-300 hover:text-white text-xs font-semibold flex items-center space-x-2 transition-all cursor-pointer shadow-sm group" data-hint="YouTube" title="Download YouTube Videos, Shorts & Playlists">
+          <svg class="w-4 h-4 text-red-500 fill-current group-hover:scale-110 transition-transform" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+          <span>YouTube</span>
+        </button>
+        <button class="platform-chip platform-quick-btn px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/50 hover:border-pink-500/40 text-slate-300 hover:text-white text-xs font-semibold flex items-center space-x-2 transition-all cursor-pointer shadow-sm group" data-hint="Instagram" title="Download Instagram Reels & Stories">
+          <svg class="w-4 h-4 text-pink-500 group-hover:scale-110 transition-transform" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+          <span>Instagram</span>
+        </button>
+        <button class="platform-chip platform-quick-btn px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/50 hover:border-cyan-400/40 text-slate-300 hover:text-white text-xs font-semibold flex items-center space-x-2 transition-all cursor-pointer shadow-sm group" data-hint="TikTok" title="Download TikTok Videos without Watermark">
+          <svg class="w-4 h-4 fill-current text-cyan-400 group-hover:scale-110 transition-transform" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.298-.002.595.042.88.13V9.4a6.33 6.33 0 0 0-1-.08A6.34 6.34 0 0 0 3 15.66a6.34 6.34 0 0 0 10.82 4.47 6.28 6.28 0 0 0 1.87-4.47V8.72A8.17 8.17 0 0 0 20.3 10V6.69z"/></svg>
+          <span>TikTok</span>
+        </button>
+        <button class="platform-chip platform-quick-btn px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/50 hover:border-blue-500/40 text-slate-300 hover:text-white text-xs font-semibold flex items-center space-x-2 transition-all cursor-pointer shadow-sm group" data-hint="Facebook" title="Download Facebook Videos & Watch Clips">
+          <svg class="w-4 h-4 fill-current text-blue-500 group-hover:scale-110 transition-transform" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          <span>Facebook</span>
+        </button>
+        <button class="platform-chip platform-quick-btn px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/50 hover:border-slate-400/40 text-slate-300 hover:text-white text-xs font-semibold flex items-center space-x-2 transition-all cursor-pointer shadow-sm group" data-hint="Twitter/X" title="Download Twitter (X) Videos & GIFs">
+          <svg class="w-3.5 h-3.5 fill-current text-slate-200 group-hover:scale-110 transition-transform" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          <span>Twitter / X</span>
+        </button>
+        <button class="platform-chip platform-quick-btn px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-700/50 hover:border-red-600/40 text-slate-300 hover:text-white text-xs font-semibold flex items-center space-x-2 transition-all cursor-pointer shadow-sm group" data-hint="Pinterest" title="Download Pinterest Videos & Idea Pins">
+          <svg class="w-4 h-4 text-red-600 fill-current group-hover:scale-110 transition-transform" viewBox="0 0 24 24"><path d="M12 0a12 12 0 0 0-4.37 23.18c-.04-.98-.08-2.5.02-3.57.1-.98.63-4.24.63-4.24s-.16-.32-.16-.8c0-.75.44-1.31.98-1.31.46 0 .68.35.68.76 0 .47-.3 1.16-.45 1.8-.13.54.27.98.8.98 1 0 1.7-.1.35 1.7-2.35 0-1.28-.93-2.32-2.32-2.32-1.7 0-2.7 1.28-2.7 2.6 0 .52.2 1.07.45 1.37.05.06.06.12.04.18-.04.18-.14.58-.16.66-.03.1-.09.13-.2.08-.74-.35-1.2-1.43-1.2-2.3 0-1.87 1.36-3.6 3.92-3.6 2.06 0 3.66 1.47 3.66 3.43 0 2.05-1.29 3.7-3.08 3.7-.6 0-1.17-.31-1.36-.68l-.37 1.4c-.13.52-.49 1.17-.73 1.56A12.01 12.01 0 1 0 12 0z"/></svg>
+          <span>Pinterest</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingSection" class="hidden max-w-3xl mx-auto my-6">
+      <div class="glass-panel p-6 rounded-2xl text-center">
+        <div class="w-10 h-10 mx-auto mb-3 rounded-full border-4 border-indigo-500/30 border-t-indigo-500 animate-spin"></div>
+        <h3 class="text-sm sm:text-base font-semibold text-slate-200 mb-1">Analyzing Media & Streams...</h3>
+        <p class="text-xs text-slate-400">Connecting to server to extract video details and playlist items...</p>
+      </div>
+    </div>
+
+    <!-- Error Banner -->
+    <div id="errorSection" class="hidden max-w-3xl mx-auto my-6">
+      <div class="p-4 rounded-2xl bg-red-950/40 border border-red-500/40 flex items-start space-x-3 text-red-200 text-xs sm:text-sm">
+        <i data-lucide="alert-circle" class="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5"></i>
+        <div>
+          <div class="font-bold text-red-300 mb-0.5">Extraction Failed</div>
+          <div id="errorMessage" class="text-red-200/90 font-mono text-xs"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Single Video Result Section -->
+    <div id="resultSection" class="hidden max-w-4xl mx-auto mb-8 relative">
+      <div class="glass-panel p-4 sm:p-6 rounded-3xl grid grid-cols-1 md:grid-cols-12 gap-6 items-start relative">
+        <button id="closeResultSectionBtn" type="button" class="absolute top-3 right-3 sm:top-4 sm:right-4 p-1.5 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 border border-slate-700/60 hover:border-rose-500/40 text-slate-400 hover:text-rose-400 transition-all cursor-pointer z-10" title="Close Preview">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+        
+        <!-- Left Col: Media Preview -->
+        <div class="md:col-span-5 flex flex-col space-y-4">
+          <div class="relative rounded-2xl overflow-hidden bg-slate-900 aspect-video shadow-lg border border-slate-700/50">
+            <img id="mediaThumbnail" src="" alt="Thumbnail" class="w-full h-full object-cover" />
+            <div id="mediaDuration" class="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 text-slate-200 text-[11px] font-mono font-semibold">
+              --:--
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center space-x-2 mb-1.5">
+              <span id="platformBadge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border">
+                Platform
+              </span>
+            </div>
+            <h3 id="mediaTitle" class="text-sm sm:text-base font-bold text-white line-clamp-2 mb-1">
+              Video Title
+            </h3>
+            <div class="flex items-center text-xs text-slate-400 space-x-2">
+              <i data-lucide="user" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span id="mediaUploader">Creator</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Col: Quality Selection & Download -->
+        <div class="md:col-span-7 flex flex-col justify-between h-full space-y-4">
+          
+          <div class="space-y-3">
+            <!-- Already Downloaded Notification Card -->
+            <div id="alreadyDownloadedBanner" class="hidden p-3 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 flex items-center justify-between gap-3 shadow-md">
+              <div class="flex items-center space-x-2.5 overflow-hidden">
+                <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                  <i data-lucide="check-circle-2" class="w-4 h-4"></i>
+                </div>
+                <div class="truncate">
+                  <div class="text-xs font-bold text-emerald-300 flex items-center space-x-1.5">
+                    <span>Already in Library</span>
+                    <span id="alreadyDownloadedSizeTag" class="text-[10px] font-mono px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 rounded"></span>
+                  </div>
+                  <div id="alreadyDownloadedSub" class="text-[11px] text-slate-300 truncate">File is already saved on your PC</div>
+                </div>
+              </div>
+              <div class="flex items-center space-x-1.5 flex-shrink-0">
+                <button id="alreadyDownloadedPlayBtn" type="button" class="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1 shadow-sm transition-all cursor-pointer">
+                  <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                  <span>Play</span>
+                </button>
+                <button id="alreadyDownloadedFolderBtn" type="button" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 rounded-xl text-xs font-semibold flex items-center transition-all cursor-pointer" title="Highlight in Folder">
+                  <i data-lucide="folder" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Format Category Selector Tabs (Video vs Audio) -->
+            <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div class="inline-flex p-1 rounded-xl bg-slate-900/90 border border-slate-700/60 shadow-inner" id="resultFormatTabs">
+                <button id="tabFormatVideoBtn" type="button" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center space-x-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow cursor-pointer">
+                  <i data-lucide="video" class="w-3.5 h-3.5"></i>
+                  <span>MP4 Video</span>
+                </button>
+                <button id="tabFormatAudioBtn" type="button" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1.5 text-slate-400 hover:text-slate-200 cursor-pointer">
+                  <i data-lucide="music" class="w-3.5 h-3.5"></i>
+                  <span>MP3 Audio</span>
+                </button>
+              </div>
+              <span id="formatCategorySubtitle" class="text-[11px] text-slate-400 font-medium">Video + Audio (Merged)</span>
+            </div>
+
+            <!-- Video Formats Container -->
+            <div id="videoFormatsContainer">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-indigo-400 flex items-center space-x-1">
+                  <i data-lucide="video" class="w-3.5 h-3.5"></i>
+                  <span>Select Video Quality (MP4)</span>
+                </span>
+                <span class="text-[10px] text-slate-400">All Resolutions</span>
+              </div>
+              <div id="videoFormatsList" class="space-y-2 max-h-60 sm:max-h-64 overflow-y-auto pr-1">
+              </div>
+            </div>
+
+            <!-- Audio Formats Container -->
+            <div id="audioFormatsContainer" class="hidden">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-pink-400 flex items-center space-x-1">
+                  <i data-lucide="music" class="w-3.5 h-3.5"></i>
+                  <span>Select Audio Quality (MP3)</span>
+                </span>
+                <span class="text-[10px] text-slate-400">HQ 320kbps</span>
+              </div>
+              <div id="audioFormatsList" class="space-y-2 max-h-60 sm:max-h-64 overflow-y-auto pr-1">
+              </div>
+            </div>
+
+            <!-- Advanced Clip Trimming & Options -->
+            <div class="pt-2 border-t border-slate-800/80 space-y-2">
+              <div class="flex items-center justify-between">
+                <button type="button" id="toggleTrimOptionsBtn" class="text-xs font-bold text-indigo-400 hover:text-indigo-300 flex items-center space-x-1">
+                  <i data-lucide="scissors" class="w-3.5 h-3.5"></i>
+                  <span>Trim Clip (Optional Start / End)</span>
+                  <i data-lucide="chevron-down" class="w-3 h-3 ml-0.5"></i>
+                </button>
+
+                <label class="flex items-center space-x-1.5 cursor-pointer text-xs text-slate-300">
+                  <input type="checkbox" id="optionSubtitles" class="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 bg-slate-800 border-slate-700">
+                  <span class="text-[11px] font-medium">Download Subtitles (.SRT)</span>
+                </label>
+              </div>
+
+              <!-- Collapsible Trim Time Input Fields -->
+              <div id="trimOptionsContainer" class="hidden grid grid-cols-2 gap-2 p-2.5 rounded-xl bg-slate-900/80 border border-slate-800">
+                <div>
+                  <label class="text-[10px] font-bold text-slate-400 block mb-0.5">Start Time (mm:ss)</label>
+                  <input type="text" id="trimStartTime" placeholder="00:00" class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                </div>
+                <div>
+                  <label class="text-[10px] font-bold text-slate-400 block mb-0.5">End Time (mm:ss)</label>
+                  <input type="text" id="trimEndTime" placeholder="02:30" class="w-full px-2.5 py-1.5 bg-slate-800 border border-slate-700 rounded-lg text-xs text-white font-mono placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Download Action Button -->
+          <div class="pt-2 border-t border-slate-800 flex items-center space-x-2">
+            <button 
+              id="downloadActionBtn"
+              class="btn-primary flex-1 py-3.5 rounded-2xl text-white font-extrabold text-sm sm:text-base flex items-center justify-center space-x-2 cursor-pointer shadow-lg"
+            >
+              <i data-lucide="download" class="w-5 h-5"></i>
+              <span>Download Now</span>
+            </button>
+            <button 
+              id="dismissResultBtn" 
+              type="button" 
+              class="px-4 py-3.5 rounded-2xl bg-slate-800/80 hover:bg-rose-500/20 border border-slate-700/60 hover:border-rose-500/40 text-slate-300 hover:text-rose-400 font-semibold text-sm flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm"
+              title="Remove Preview"
+            >
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+              <span>Remove</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- PLAYLIST SECTION (Dedicated Playlist Queue Manager) -->
+    <div id="playlistSection" class="hidden max-w-4xl mx-auto mb-8">
+      <div class="glass-panel p-4 sm:p-6 rounded-3xl">
+        
+        <!-- Playlist Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800 mb-4">
+          <div class="flex items-start space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="list-video" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-[10px] font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full border border-purple-500/30">Playlist</span>
+                <span id="playlistCount" class="text-xs text-slate-400">0 Videos</span>
+              </div>
+              <h2 id="playlistTitle" class="text-base sm:text-lg font-bold text-white line-clamp-1 mt-0.5">Playlist Title</h2>
+              <div id="playlistUploader" class="text-xs text-slate-400">Creator</div>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <span id="playlistDownloadedCount" class="text-xs font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-3 py-1 rounded-full">
+              0 / 0 Downloaded
+            </span>
+            <button id="closePlaylistSectionBtn" type="button" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 border border-slate-700/60 hover:border-rose-500/40 text-slate-300 hover:text-rose-400 transition-all cursor-pointer font-medium text-xs shadow-sm" title="Remove Playlist View">
+              <i data-lucide="x" class="w-4 h-4"></i>
+              <span>Close / Remove</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Queue Toolbar & Controls -->
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4 p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
+          
+          <div class="flex items-center space-x-2">
+            <input type="checkbox" id="selectAllCheckbox" checked class="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer">
+            <label for="selectAllCheckbox" class="text-xs font-semibold text-slate-300 cursor-pointer">Select All</label>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <span class="text-xs text-slate-400 font-medium">Format:</span>
+            <select id="playlistFormatSelect" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-indigo-500 font-semibold">
+              <option value="video" selected>HD Video (MP4)</option>
+              <option value="audio">Audio Only (MP3 HQ)</option>
+            </select>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <button id="playlistDownloadAllBtn" class="btn-primary px-4 py-2 rounded-xl text-white text-xs font-bold flex items-center space-x-1.5 cursor-pointer shadow-md">
+              <i data-lucide="download-cloud" class="w-4 h-4"></i>
+              <span>Download Selected</span>
+            </button>
+            <button id="playlistDismissBtn" type="button" class="px-3 py-2 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 border border-slate-700/60 hover:border-rose-500/40 text-slate-300 hover:text-rose-400 text-xs font-semibold flex items-center space-x-1.5 cursor-pointer transition-all shadow-sm" title="Remove Playlist from screen">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span>Remove</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Video Items List in Playlist -->
+        <div id="playlistItemsList" class="space-y-2.5 max-h-[480px] overflow-y-auto pr-1">
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Saved Playlists Library Section (ONLY SHOWN WHEN PLAYLISTS EXIST) -->
+    <div id="savedPlaylistsSection" class="hidden max-w-4xl mx-auto mt-4 mb-6">
+      <div class="glass-panel p-4 sm:p-6 rounded-3xl">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center">
+              <i data-lucide="bookmark" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h2 class="text-sm sm:text-base font-bold text-white">Saved Playlists & Queues</h2>
+              <p class="text-[11px] text-slate-400">Playlists are remembered here permanently so you can download remaining videos anytime/any day</p>
+            </div>
+          </div>
+        </div>
+
+        <div id="savedPlaylistsList" class="space-y-2">
+        </div>
+      </div>
+    </div>
+
+    <!-- Active & Recent Downloads Panel (Desktop Utility Dashboard) -->
+    <div id="downloadsPanel" class="max-w-4xl mx-auto mt-6 mb-12">
+      <div class="glass-panel p-4 sm:p-6 rounded-3xl shadow-2xl border border-slate-800/80">
+        
+        <!-- Panel Header -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between pb-4 mb-4 border-b border-slate-800/60 gap-3">
+          <div class="flex items-center space-x-3">
+            <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shadow-inner flex-shrink-0">
+              <i data-lucide="download" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <div class="flex items-center space-x-2">
+                <h2 class="text-sm sm:text-base font-bold text-white tracking-tight">Active & Recent Downloads</h2>
+                <span id="panelActiveBadge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 animate-pulse">Downloading</span>
+              </div>
+              <p class="text-[11px] text-slate-400">High-speed background queue, real-time progress and saved media library</p>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2 self-start sm:self-auto flex-shrink-0">
+            <button id="panelOpenManagerBtn" type="button" class="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm" title="Open Dedicated Live Download Queue Manager">
+              <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+              <span>Download Manager</span>
+            </button>
+            <button id="panelOpenFolderBtn" type="button" class="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 hover:text-white border border-slate-700/50 text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm" title="Open Download Folder">
+              <i data-lucide="folder-open" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span>Open Folder</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Active In-Progress Downloads Section -->
+        <div id="panelActiveSection" class="hidden mb-5 space-y-2.5">
+          <div class="text-[11px] font-bold uppercase tracking-wider text-indigo-400 flex items-center space-x-1.5">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span>Downloading Now</span>
+          </div>
+          <div id="panelActiveItemsList" class="space-y-2.5">
+          </div>
+        </div>
+
+        <!-- Recent Completed Downloads Section -->
+        <div id="panelRecentSection" class="hidden space-y-3">
+          <!-- Library Header with Search & Filter Controls -->
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-800/50">
+            <div class="flex items-center space-x-2">
+              <div class="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center space-x-1.5">
+                <i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>Completed Downloads</span>
+              </div>
+              <span id="historyCountBadge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700">0</span>
+            </div>
+
+            <!-- Search & Media Filters -->
+            <div class="flex items-center space-x-2">
+              <!-- Filter Chips (All / Video / Audio) -->
+              <div class="inline-flex p-0.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] font-semibold">
+                <button type="button" id="historyFilterAll" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white cursor-pointer transition-all">All</button>
+                <button type="button" id="historyFilterVideo" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white cursor-pointer transition-all">Videos</button>
+                <button type="button" id="historyFilterAudio" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white cursor-pointer transition-all">Audio</button>
+              </div>
+
+              <!-- Search Bar -->
+              <div class="relative w-40 sm:w-52">
+                <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none"></i>
+                <input 
+                  type="text" 
+                  id="historySearchInput" 
+                  placeholder="Search downloads..." 
+                  class="w-full pl-8 pr-7 py-1.5 bg-slate-900/90 border border-slate-700/60 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-all font-medium"
+                />
+                <button id="historyClearSearchBtn" type="button" class="hidden absolute right-2 top-2 text-slate-400 hover:text-white">
+                  <i data-lucide="x" class="w-3 h-3"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- History Items Container -->
+          <div id="historyList" class="space-y-2.5">
+          </div>
+
+          <!-- No Search Results Found View -->
+          <div id="historyNoResults" class="hidden p-6 text-center text-xs text-slate-400 space-y-1">
+            <i data-lucide="search-x" class="w-6 h-6 text-slate-500 mx-auto mb-1"></i>
+            <div class="font-semibold text-slate-300">No matching downloads found</div>
+            <div class="text-[11px] text-slate-500">Try searching for a different keyword or change filter</div>
+          </div>
+        </div>
+
+        <!-- Sleek Empty State Illustration (when no active or past downloads) -->
+        <div id="panelEmptyState" class="hidden py-8 px-4 text-center space-y-3">
+          <div class="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto shadow-inner">
+            <i data-lucide="cloud-download" class="w-7 h-7"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-slate-200">No Downloads Yet</h3>
+            <p class="text-xs text-slate-400 max-w-sm mx-auto mt-0.5">Paste a video link or playlist URL above to start downloading in lightning-fast speed.</p>
+          </div>
+          <div class="pt-1">
+            <button id="emptyStatePasteBtn" type="button" class="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md transition-all inline-flex items-center space-x-1.5 cursor-pointer">
+              <i data-lucide="clipboard" class="w-3.5 h-3.5"></i>
+              <span>Paste from Clipboard</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+    
+    <!-- Legacy compatibility alias (hidden) -->
+    <div id="downloadedLibrarySection" class="hidden"></div>
+
+  </main>
+
+  <!-- =========================================================================
+       DEDICATED DOWNLOAD MANAGER POPUP MODAL (IDM STYLE)
+       ========================================================================= -->
+  <div id="downloadManagerModal" class="hidden fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-3 sm:p-6">
+    <div class="glass-modal modal-animate w-full max-w-3xl rounded-3xl overflow-hidden flex flex-col max-h-[92vh] border border-indigo-500/40">
+      
+      <!-- Modal Header -->
+      <div class="p-4 sm:p-5 bg-slate-900/90 border-b border-indigo-500/20 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <img src="/icon.png" class="w-9 h-9 rounded-xl shadow-md border border-white/20">
+          <div>
+            <h3 class="text-sm sm:text-base font-extrabold text-white flex items-center space-x-2">
+              <span>UVD Live Download Manager</span>
+              <span id="modalQueueBadge" class="text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full">Queue: 0 Items</span>
+            </h3>
+            <div id="modalStatusSub" class="text-xs text-slate-400 font-medium">Real-time status, pause, resume & priority switcher</div>
+          </div>
+        </div>
+
+        <!-- Window Controls -->
+        <div class="flex items-center space-x-2">
+          <button id="modalMinimizeBtn" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all" title="Minimize to Floating Bar">
+            <i data-lucide="minus" class="w-4 h-4"></i>
+          </button>
+          <button id="modalCloseBtn" class="p-2 rounded-xl bg-slate-800 hover:bg-red-950/60 text-slate-400 hover:text-red-400 transition-all" title="Close Window">
+            <i data-lucide="x" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="p-4 sm:p-6 overflow-y-auto space-y-5 flex-grow">
+        
+        <!-- Active Download Spotlight Card -->
+        <div id="modalActiveCard" class="p-4 sm:p-5 rounded-2xl bg-indigo-950/50 border border-indigo-500/40 shadow-xl relative overflow-hidden">
+          <div class="flex flex-col sm:flex-row gap-4 items-start mb-4">
+            
+            <!-- Thumbnail -->
+            <div class="relative w-full sm:w-36 aspect-video rounded-xl overflow-hidden bg-slate-900 flex-shrink-0 border border-indigo-500/30">
+              <img id="activeSpotlightThumb" src="" class="w-full h-full object-cover">
+              <span id="activeSpotlightIndex" class="absolute top-1.5 left-1.5 bg-indigo-600 text-white font-bold text-[10px] px-1.5 py-0.5 rounded">#1</span>
+            </div>
+
+            <!-- Title & Info -->
+            <div class="flex-grow overflow-hidden">
+              <div class="flex items-center space-x-2 mb-1">
+                <span id="activeSpotlightFormatBadge" class="text-[10px] font-bold bg-pink-500/20 text-pink-300 border border-pink-500/30 px-2 py-0.5 rounded">MP4 HD</span>
+                <span id="activeSpotlightStatusPill" class="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded flex items-center space-x-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Active Download</span>
+                </span>
+              </div>
+              <h4 id="activeSpotlightTitle" class="text-sm sm:text-base font-bold text-white line-clamp-1 mb-1">Connecting to stream...</h4>
+              <div id="activeSpotlightStatusMessage" class="text-xs text-indigo-300 font-medium">Fetching video chunks in high-speed...</div>
+            </div>
+
+          </div>
+
+          <!-- Big Live Progress Bar -->
+          <div class="space-y-2 mb-4">
+            <div class="flex items-center justify-between text-xs font-bold text-indigo-200">
+              <span id="activeProgressLabel">Download Progress</span>
+              <span id="activeProgressPercent" class="text-base font-mono text-indigo-300">0%</span>
+            </div>
+            <div class="w-full h-3.5 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-indigo-500/30">
+              <div id="activeProgressBarFill" class="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full transition-all duration-300" style="width: 2%"></div>
+            </div>
+            <div class="flex items-center justify-between text-xs font-mono text-slate-300">
+              <span id="activeProgressBytes">0 MB / 0 MB</span>
+              <div class="flex items-center space-x-3">
+                <span id="activeProgressSpeed" class="text-indigo-300 font-semibold">-- MB/s</span>
+                <span id="activeProgressEta" class="text-pink-300 font-semibold">Time Left: --:--</span>
+              </div>
+          </div>
+
+          <!-- Spotlight Action Buttons (Pause, Skip, Stop) -->
+          <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-indigo-500/20">
+            <button id="activePauseResumeBtn" class="py-2 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow-md">
+              <i data-lucide="pause" class="w-3.5 h-3.5"></i>
+              <span>Pause Download</span>
+            </button>
+            <button id="activeCancelCurrentBtn" class="py-2 px-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/40 text-rose-300 text-xs font-bold flex items-center space-x-1.5 border border-rose-500/30">
+              <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              <span>Cancel Current</span>
+            </button>
+            <button id="activeSkipNextBtn" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center space-x-1.5 border border-slate-700">
+              <i data-lucide="skip-forward" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span>Skip to Next</span>
+            </button>
+            <button id="activeOpenFolderBtn" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center space-x-1.5 border border-slate-700">
+              <i data-lucide="folder" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span>Open Folder</span>
+            </button>
+            <button id="activeStopAllBtn" class="py-2 px-3 rounded-xl bg-red-950/60 hover:bg-red-900/60 text-red-300 text-xs font-bold flex items-center space-x-1.5 border border-red-500/30 ml-auto">
+              <i data-lucide="square" class="w-3.5 h-3.5"></i>
+              <span>Stop Queue</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Upcoming Playlist Queue Section -->
+        <div>
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center space-x-1.5">
+              <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span>Queue Items & Manual Priority Controls</span>
+            </h4>
+            <span class="text-[11px] text-slate-400">Click <b>"Download This Now"</b> to jump directly to any video!</span>
+          </div>
+          
+          <div id="modalQueueItemsList" class="space-y-2 max-h-56 overflow-y-auto pr-1">
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-3 sm:p-4 bg-slate-900/90 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+        <div class="flex items-center space-x-2">
+          <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+          <span>Files automatically saved in <b>Downloads\OmniDownloader</b></span>
+        </div>
+        <button id="modalDoneBtn" class="py-1.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs">
+          Hide Manager
+        </button>
+      </div>
+
+    </div>
+  </div>
+  </div>
+
+  <!-- FLOATING MINIMIZED DOWNLOAD BAR (Bottom Right) -->
+  <div id="floatingDownloadPill" class="hidden fixed bottom-16 sm:bottom-6 right-4 sm:right-6 z-40 cursor-pointer floating-download-badge">
+    <div class="p-3 sm:p-3.5 rounded-2xl bg-[#131b2e] border border-indigo-500/60 flex items-center space-x-3 shadow-2xl hover:bg-indigo-900 transition-all">
+      <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white flex-shrink-0">
+        <i data-lucide="download" class="w-4 h-4"></i>
+      </div>
+      <div>
+        <div class="text-xs font-bold text-white flex items-center space-x-2">
+          <span id="floatingTitle" class="line-clamp-1 max-w-[140px] sm:max-w-[200px]">Downloading...</span>
+          <span id="floatingPercent" class="text-pink-400 font-mono">0%</span>
+        </div>
+        <div class="text-[10px] text-indigo-300 font-mono">
+          <span id="floatingSpeed">0 MB/s</span> • <span>Click to expand manager</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom Action Bar -->
+  <div class="sm:hidden fixed bottom-0 left-0 right-0 bg-[#0c1220] border-t border-slate-800/80 px-4 py-2.5 flex items-center justify-around z-40">
+    <button onclick="window.scrollTo({top: 0, behavior: 'smooth'}); document.getElementById('urlInput').focus();" class="flex flex-col items-center text-indigo-400">
+      <i data-lucide="plus-circle" class="w-5 h-5"></i>
+      <span class="text-[10px] font-semibold mt-0.5">New URL</span>
+    </button>
+    <button onclick="openDownloadManagerModal()" class="flex flex-col items-center text-indigo-300">
+      <i data-lucide="activity" class="w-5 h-5"></i>
+      <span class="text-[10px] font-semibold mt-0.5">Manager</span>
+    </button>
+    <button onclick="document.getElementById('openFolderBtn').click()" class="flex flex-col items-center text-slate-300">
+      <i data-lucide="folder" class="w-5 h-5"></i>
+      <span class="text-[10px] font-semibold mt-0.5">Saved Files</span>
+    </button>
+  </div>
+
+  <!-- =========================================================================
+       SETTINGS & PREFERENCES MODAL
+       ========================================================================= -->
+  <div id="settingsModal" class="hidden fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
+    <div class="glass-modal modal-animate w-full max-w-lg rounded-3xl overflow-hidden flex flex-col border border-indigo-500/40">
+      
+      <!-- Modal Header -->
+      <div class="p-4 bg-slate-900/90 border-b border-indigo-500/20 flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+            <i data-lucide="settings" class="w-4 h-4"></i>
+          </div>
+          <h3 class="text-base font-extrabold text-white">UVD Settings & Preferences</h3>
+        </div>
+        <button id="closeSettingsBtn" type="button" onclick="if (window.closeSettings) { window.closeSettings(); } else { const m = document.getElementById('settingsModal'); if (m) { m.classList.add('hidden'); m.classList.remove('open'); m.style.setProperty('display', 'none', 'important'); } }" class="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <!-- Settings Form -->
+      <div class="p-5 space-y-5">
+        
+        <!-- Download Folder Setting -->
+        <div class="space-y-1.5">
+          <label class="text-xs font-bold text-slate-200 flex items-center space-x-1.5">
+            <i data-lucide="folder" class="w-3.5 h-3.5 text-indigo-400"></i>
+            <span>Download Save Location</span>
+          </label>
+          <div class="flex items-center space-x-2">
+            <input type="text" id="settingDownloadDir" readonly class="flex-grow px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-300 font-mono" />
+            <button id="browseFolderBtn" class="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center space-x-1 flex-shrink-0 transition-all">
+              <i data-lucide="folder-open" class="w-3.5 h-3.5"></i>
+              <span>Browse...</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Toggles List -->
+        <div class="space-y-3 pt-2 border-t border-slate-800">
+          
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-slate-200">Auto Clipboard Link Sniffer</div>
+              <div class="text-[10px] text-slate-400">Detect copied video links automatically and show fetch notification</div>
+            </div>
+            <input type="checkbox" id="settingAutoClipboard" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+          </div>
+
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-slate-200">Subtitles Auto Download (.SRT)</div>
+              <div class="text-[10px] text-slate-400">Automatically download subtitles when available</div>
+            </div>
+            <input type="checkbox" id="settingAutoSubtitles" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+          </div>
+
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-slate-200">Auto Shutdown PC When Queue Completes</div>
+              <div class="text-[10px] text-slate-400">Shut down computer safely after all downloads finish</div>
+            </div>
+            <input type="checkbox" id="settingAutoShutdown" class="w-4 h-4 text-indigo-600 rounded cursor-pointer">
+          </div>
+
+        </div>
+
+        <!-- App Updates & Version Section -->
+        <div class="pt-3 border-t border-slate-800 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-slate-200 flex items-center space-x-2">
+                <span>App Version</span>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 font-mono" id="settingsCurrentVerBadge">v2.1.0</span>
+              </div>
+              <div class="text-[10px] text-slate-400" id="settingsUpdateStatusText">Universal Video Downloader Pro</div>
+            </div>
+            <button id="manualCheckUpdateBtn" type="button" class="px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/40 text-xs font-bold flex items-center space-x-1.5 transition-all cursor-pointer">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5" id="checkUpdateSpinner"></i>
+              <span>Check for Updates</span>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-slate-200">Auto-check for updates</div>
+              <div class="text-[10px] text-slate-400">Automatically check for new releases when UVD opens</div>
+            </div>
+            <input type="checkbox" id="settingAutoCheckUpdates" class="w-4 h-4 text-indigo-600 rounded cursor-pointer" checked>
+          </div>
+
+          <!-- Advanced Update URL Configuration (Collapsible) -->
+          <div class="pt-1">
+            <details class="text-[11px] text-slate-400 group">
+              <summary class="cursor-pointer hover:text-indigo-400 font-semibold flex items-center space-x-1">
+                <span>Advanced Update Server URL (Optional)</span>
+              </summary>
+              <div class="mt-2 space-y-1">
+                <input type="text" id="settingUpdateUrl" placeholder="https://raw.githubusercontent.com/.../version.json" class="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-xl text-[11px] text-slate-300 font-mono focus:outline-none focus:border-indigo-500" />
+                <p class="text-[9px] text-slate-500">Custom raw JSON URL hosted on GitHub, Gist, or custom server.</p>
+              </div>
+            </details>
+          </div>
+
+          <!-- Android Mobile App Connect -->
+          <div class="p-3 rounded-2xl bg-gradient-to-r from-indigo-950/40 to-purple-950/40 border border-indigo-500/30 flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+                <i data-lucide="smartphone" class="w-4 h-4"></i>
+              </div>
+              <div>
+                <div class="text-xs font-bold text-slate-200">Android Mobile Connect</div>
+                <div id="settingsMobileUrl" class="text-[10px] text-indigo-300 font-mono">Loading IP...</div>
+              </div>
+            </div>
+            <button id="copyMobileUrlBtn" type="button" class="px-2.5 py-1 bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-lg text-[10px] font-bold border border-indigo-500/40 transition-all cursor-pointer">
+              Copy Link
+            </button>
+          </div>
+
+          <!-- Legal & Copyright Notice -->
+          <div class="pt-3 border-t border-slate-800 text-[10px] text-slate-400 flex items-center justify-between">
+            <div>
+              <span class="font-bold text-slate-300">© 2026 Ajeet Yadav. All Rights Reserved.</span>
+              <div class="text-[9px] text-slate-500">UVD™ Proprietary Software • Unauthorized copying prohibited</div>
+            </div>
+            <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono text-[9px] border border-slate-700">Protected</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Settings Footer -->
+      <div class="p-4 bg-slate-900/90 border-t border-slate-800 flex justify-end">
+        <button id="saveSettingsBtn" class="py-2 px-5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-md transition-all">
+          Save Settings
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FLOATING CLIPBOARD TOAST NOTIFICATION -->
+  <div id="clipboardToast" class="hidden fixed top-20 right-4 sm:right-6 z-50 modal-animate">
+    <div class="p-3.5 rounded-2xl bg-[#131b2e] border border-indigo-500/60 shadow-2xl flex items-center space-x-3 text-white">
+      <div class="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center flex-shrink-0">
+        <i data-lucide="clipboard" class="w-4 h-4"></i>
+      </div>
+      <div>
+        <div class="text-xs font-bold">New Video Link Copied!</div>
+        <div id="clipboardUrlText" class="text-[10px] text-indigo-300 font-mono truncate max-w-[200px]">https://...</div>
+      </div>
+      <button id="clipboardFetchBtn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-sm transition-all ml-2">
+        Fetch Now
+      </button>
+      <button id="clipboardCloseBtn" class="p-1 text-slate-400 hover:text-white">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- USER AUTHENTICATION & TRIAL ACCOUNT MODAL -->
+  <div id="authModal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 transition-all">
+    <div class="glass-panel w-full max-w-md rounded-3xl overflow-hidden shadow-2xl border border-indigo-500/30 modal-animate">
+      
+      <!-- Modal Header -->
+      <div class="p-4 bg-slate-900/90 border-b border-indigo-500/20 flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <div id="authModalIconBg" class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          </div>
+          <div>
+            <h3 id="authModalTitle" class="text-base font-extrabold text-white">UVD Account & Trial</h3>
+            <p id="authModalSubtitle" class="text-[11px] text-slate-400">7-Day Free Trial & Unlimited Downloads</p>
+          </div>
+        </div>
+        <button id="closeAuthModalBtn" type="button" class="p-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <!-- Trial Status Ribbon Inside Modal -->
+      <div id="authTrialStatusCard" class="m-4 p-3 rounded-2xl border flex items-center space-x-3 text-xs">
+        <div id="authTrialStatusIcon" class="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </div>
+        <div>
+          <div id="authTrialStatusHeadline" class="font-bold">Trial Status</div>
+          <div id="authTrialStatusSub" class="text-[11px] opacity-90 mt-0.5">Trial information...</div>
+        </div>
+      </div>
+
+      <!-- State 1: When NOT Logged In (Tabs for Register & Login) -->
+      <div id="authLoggedOutView" class="px-5 pb-5 space-y-4">
+        
+        <!-- Tabs Navigation -->
+        <div class="flex items-center rounded-xl bg-slate-900/90 p-1 border border-slate-800">
+          <button id="tabRegisterBtn" type="button" class="flex-1 py-1.5 text-xs font-bold rounded-lg text-white bg-indigo-600 transition-all cursor-pointer">
+            Create Account
+          </button>
+          <button id="tabLoginBtn" type="button" class="flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer">
+            Sign In (Login)
+          </button>
+        </div>
+
+        <!-- Registration Form -->
+        <form id="registerForm" class="space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Full Name</label>
+            <input type="text" id="regName" placeholder="e.g. Alex Johnson" required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Email ID</label>
+            <input type="email" id="regEmail" placeholder="name@example.com" required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Password (Min. 4 characters)</label>
+            <input type="password" id="regPassword" placeholder="••••••••" required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+          </div>
+          <button type="submit" id="regSubmitBtn" class="btn-primary w-full py-2.5 rounded-xl text-white font-bold text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-lg">
+            <span>Create Account & Unlock Downloads</span>
+          </button>
+        </form>
+
+        <!-- Login Form -->
+        <form id="loginForm" class="space-y-3 hidden">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Email ID</label>
+            <input type="email" id="loginEmail" placeholder="name@example.com" required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Password</label>
+            <input type="password" id="loginPassword" placeholder="••••••••" required class="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500" />
+          </div>
+          <button type="submit" id="loginSubmitBtn" class="btn-primary w-full py-2.5 rounded-xl text-white font-bold text-xs flex items-center justify-center space-x-1.5 cursor-pointer shadow-lg">
+            <span>Sign In to Account</span>
+          </button>
+        </form>
+
+      </div>
+
+      <!-- State 2: When LOGGED IN (Profile Details & Logout) -->
+      <div id="authLoggedInView" class="hidden px-5 pb-5 space-y-4">
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center space-x-3.5">
+          <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white font-black text-lg flex items-center justify-center shadow-lg">
+            <span id="userAvatarText">U</span>
+          </div>
+          <div>
+            <div id="userProfileName" class="text-sm font-bold text-white">User Name</div>
+            <div id="userProfileEmail" class="text-xs text-slate-400 font-mono">user@example.com</div>
+            <div class="mt-1 flex items-center space-x-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Permanent Unlimited Access</span>
+            </div>
+          </div>
+        </div>
+
+        <button id="logoutBtn" type="button" class="w-full py-2 rounded-xl bg-slate-800 hover:bg-rose-500/20 border border-slate-700/60 hover:border-rose-500/40 text-slate-300 hover:text-rose-400 font-semibold text-xs transition-all cursor-pointer flex items-center justify-center space-x-1.5">
+          <span>Log Out</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CUSTOM CONFIRMATION MODAL (Replaces Browser native confirm) -->
+  <div id="customConfirmModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4 transition-all">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 modal-animate">
+      <div class="flex items-center space-x-3">
+        <div id="confirmModalIconBg" class="w-10 h-10 rounded-xl bg-red-500/20 text-red-400 flex items-center justify-center flex-shrink-0">
+          <i id="confirmModalIcon" data-lucide="alert-triangle" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 id="confirmModalTitle" class="text-base font-bold text-slate-100">Confirm Action</h3>
+          <p id="confirmModalSubtitle" class="text-xs text-slate-400">Please confirm your decision below</p>
+        </div>
+      </div>
+
+      <p id="confirmModalMessage" class="text-xs text-slate-300 leading-relaxed bg-slate-950/50 p-3 rounded-xl border border-slate-800 font-medium">
+        Are you sure you want to proceed?
+      </p>
+
+      <div class="flex items-center justify-end space-x-3 pt-2">
+        <button id="confirmModalCancelBtn" type="button" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-all cursor-pointer">
+          Cancel
+        </button>
+        <button id="confirmModalOkBtn" type="button" class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold shadow-lg transition-all flex items-center space-x-1 cursor-pointer">
+          <span id="confirmModalOkText">Delete</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOM ALERT TOAST (Replaces Browser native alert) -->
+  <div id="customAlertToast" class="hidden fixed bottom-6 right-6 z-[100] max-w-sm w-full p-4 rounded-2xl bg-slate-900 border border-indigo-500/50 shadow-2xl flex items-center space-x-3 text-white modal-animate">
+    <div id="alertToastIconBg" class="w-9 h-9 rounded-xl bg-indigo-600/30 text-indigo-400 flex items-center justify-center flex-shrink-0">
+      <i id="alertToastIcon" data-lucide="info" class="w-5 h-5"></i>
+    </div>
+    <div class="flex-grow pr-2">
+      <div id="alertToastTitle" class="text-xs font-bold text-slate-200">Notice</div>
+      <div id="alertToastMessage" class="text-xs text-slate-300">Message content</div>
+    </div>
+    <button id="alertToastCloseBtn" class="p-1 text-slate-400 hover:text-white">
+      <i data-lucide="x" class="w-4 h-4"></i>
+    </button>
+  </div>
+
+  <!-- =========================================================================
+       NEW UPDATE AVAILABLE MODAL (IN-APP UPDATER)
+       ========================================================================= -->
+  <div id="updateModal" class="hidden fixed inset-0 bg-black/85 z-50 flex items-center justify-center p-4">
+    <div class="glass-modal modal-animate w-full max-w-md rounded-3xl overflow-hidden flex flex-col border border-amber-500/40 shadow-2xl">
+      
+      <!-- Header -->
+      <div class="p-5 bg-gradient-to-r from-amber-950/90 via-purple-950/90 to-slate-900 border-b border-amber-500/30 flex items-start justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center font-bold">
+            <i data-lucide="rocket" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 class="text-base font-extrabold text-white">New Update Available!</h3>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950" id="modalUpdateNewVerTag">v2.2.0</span>
+            </div>
+            <p class="text-xs text-amber-200/80" id="modalUpdateReleaseName">UVD Performance & 4K Update</p>
+          </div>
+        </div>
+        <button id="closeUpdateModalBtn" type="button" class="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-all cursor-pointer">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="p-5 space-y-4">
+        <!-- Version Compare Box -->
+        <div class="p-3 rounded-2xl bg-slate-900/80 border border-slate-800 flex items-center justify-around text-center">
+          <div>
+            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Installed</div>
+            <div class="text-sm font-black font-mono text-slate-300" id="modalCurrentVersion">v2.1.0</div>
+          </div>
+          <i data-lucide="arrow-right" class="w-4 h-4 text-indigo-400"></i>
+          <div>
+            <div class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Latest Version</div>
+            <div class="text-sm font-black font-mono text-amber-300" id="modalLatestVersion">v2.2.0</div>
+          </div>
+        </div>
+
+        <!-- Changelog -->
+        <div>
+          <div class="text-xs font-bold text-slate-300 mb-2 flex items-center space-x-1.5">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span>What's New in this version:</span>
+          </div>
+          <div id="modalUpdateChangelogList" class="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 text-xs text-slate-300 space-y-2 max-h-40 overflow-y-auto font-medium">
+            <!-- Bullets populated dynamically -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="p-4 bg-slate-900/90 border-t border-slate-800 flex items-center justify-between gap-3">
+        <button id="updateLaterBtn" type="button" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all cursor-pointer">
+          Remind Later
+        </button>
+        <button id="updateDownloadNowBtn" type="button" class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 via-purple-600 to-pink-500 hover:opacity-95 text-white text-xs font-extrabold flex items-center justify-center space-x-2 shadow-lg transition-all cursor-pointer">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Download & Update</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- In-App Media Player Modal (Plays any downloaded video/audio directly on phone & laptop) -->
+  <div id="mediaPlayerModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 transition-all">
+    <div class="bg-[#111827] border border-slate-700/60 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col">
+      <!-- Player Header -->
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center space-x-2 overflow-hidden pr-2">
+          <svg class="w-5 h-5 text-indigo-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+          <h4 id="playerModalTitle" class="text-sm font-bold text-white truncate">Playing Media</h4>
+        </div>
+        <button id="closeMediaPlayerBtn" type="button" class="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer transition-all flex-shrink-0">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <!-- Video / Audio Player Container -->
+      <div class="relative bg-black flex items-center justify-center min-h-[220px] max-h-[60vh]">
+        <video id="inAppVideoPlayer" controls playsinline class="w-full max-h-[60vh] object-contain"></video>
+      </div>
+
+      <!-- Player Controls / Save Options Footer -->
+      <div class="p-4 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3">
+        <a id="playerDirectDownloadBtn" href="#" download class="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center justify-center space-x-2 transition-all cursor-pointer shadow-md">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          <span>Save to Phone / Gallery</span>
+        </a>
+        <button id="playerDismissBtn" type="button" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer transition-all">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       MOBILE NATIVE BOTTOM NAVIGATION BAR (Android & Mobile Only - Strictly Hidden on Laptop/Desktop)
+       ========================================================================== -->
+  <nav id="mobileBottomNav" class="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#0c1220]/95 backdrop-blur-xl border-t border-slate-800/80 px-2 py-1.5 flex items-center justify-around shadow-2xl transition-all" style="padding-bottom: max(6px, env(safe-area-inset-bottom));">
+    
+    <!-- Tab 1: Home (Downloader) -->
+    <button id="mobileNavHomeBtn" type="button" class="mobile-nav-item active flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all group cursor-pointer text-indigo-400">
+      <div class="relative">
+        <svg class="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+      </div>
+      <span class="text-[10px] font-bold mt-0.5 tracking-tight">Home</span>
+    </button>
+
+    <!-- Tab 2: Queue (Active Stream) -->
+    <button id="mobileNavQueueBtn" type="button" class="mobile-nav-item flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all group cursor-pointer text-slate-400 relative">
+      <div class="relative">
+        <svg class="w-5 h-5 transition-transform group-hover:text-indigo-300 group-hover:scale-110" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        <span id="mobileQueueCountBadge" class="hidden absolute -top-1.5 -right-2 px-1.5 py-0.2 bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[9px] font-black rounded-full shadow-sm animate-pulse">0</span>
+      </div>
+      <span class="text-[10px] font-medium mt-0.5 tracking-tight">Queue</span>
+    </button>
+
+    <!-- Tab 3: Library (Downloads) -->
+    <button id="mobileNavLibraryBtn" type="button" class="mobile-nav-item flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all group cursor-pointer text-slate-400 relative">
+      <div class="relative">
+        <svg class="w-5 h-5 transition-transform group-hover:text-indigo-300 group-hover:scale-110" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <span id="mobileDownloadsCountBadge" class="hidden absolute -top-1.5 -right-2 px-1.5 py-0.2 bg-indigo-500 text-white text-[9px] font-bold rounded-full shadow-sm">0</span>
+      </div>
+      <span class="text-[10px] font-medium mt-0.5 tracking-tight">Library</span>
+    </button>
+
+    <!-- Tab 4: Settings -->
+    <button id="mobileNavSettingsBtn" type="button" class="mobile-nav-item flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all group cursor-pointer text-slate-400">
+      <div class="relative">
+        <svg class="w-5 h-5 transition-transform group-hover:text-indigo-300 group-hover:scale-110" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </div>
+      <span class="text-[10px] font-medium mt-0.5 tracking-tight">Settings</span>
+    </button>
+
+  </nav>
+
+  <!-- Scripts -->
+  <script src="/js/app2.js?v=2.1.3"></script>
+  <script>
+    if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
+  </script>
+</body>
+</html>

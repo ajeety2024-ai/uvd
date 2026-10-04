@@ -1,0 +1,14 @@
+{
+  "latest_version": "2.1.0",
+  "release_name": "UVD v2.1 - 4K High Speed & Format Filter",
+  "release_date": "2026-10-02",
+  "changelog": [
+    "Added full 4K, 2K, 1080p, 720p, 480p, 360p resolution extraction with sizes",
+    "Added Pinterest video & photo downloader support",
+    "Separate Video and Audio tabs with format filtering",
+    "Added live Cancel / Remove buttons for download queues and previews",
+    "Integrated live In-App Auto Updater & version notification system"
+  ],
+  "download_url": "https://github.com/ajeet-yadav/uvd-downloader/releases/latest",
+  "mandatory": false
+}

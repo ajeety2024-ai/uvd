@@ -1,0 +1,41 @@
+================================================================================
+END USER LICENSE AGREEMENT & PROPRIETARY NOTICE
+UVD (Universal Video Downloader)
+================================================================================
+
+Copyright (c) 2026 Ajeet Yadav. All Rights Reserved.
+Author & Original Creator: Ajeet Yadav
+
+1. PROPRIETARY SOFTWARE:
+   UVD - Universal Video Downloader ("Software"), including its source code,
+   binary distributions, algorithms, icons, UI designs, documentation, and all
+   intellectual property, is owned exclusively by Ajeet Yadav.
+
+2. GRANT OF LICENSE:
+   This Software is licensed, not sold, for personal and non-commercial end-user
+   use only under authorized access terms.
+
+3. RESTRICTIONS ON USE:
+   You may NOT, under any circumstances:
+   a) Decompile, disassemble, reverse engineer, or extract source code from this Software.
+   b) Modify, alter, translate, adapt, or create derivative works based on this Software.
+   c) Rebrand, rename, resell, sublicense, rent, lease, or redistribute this Software.
+   d) Claim ownership, authorship, or credit for the Software or any portion thereof.
+   e) Circumvent, disable, or tamper with any trial or security licensing mechanisms.
+
+4. TRADEMARKS & COPYRIGHT:
+   "UVD", "Universal Video Downloader", and related logos are trademarks of Ajeet Yadav.
+   Unauthorized use of these trademarks is strictly prohibited.
+
+5. VIOLATIONS:
+   Any infringement, theft, or unauthorized distribution of this Software will
+   be pursued to the fullest extent of the law under applicable Copyright,
+   Intellectual Property, and Cyber Crime legislations.
+
+================================================================================
+For licensing inquiries or legal contact:
+Developer & Author: Ajeet Yadav
+Product: UVD - Universal Video Downloader
+Version: 2.1.0 (2026)
+================================================================================
+
