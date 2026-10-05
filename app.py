@@ -169,12 +169,13 @@ def ensure_mobile_compatible_mp4(file_path: str) -> str:
 
     try:
         probe_cmd = [str(ffmpeg_exe), "-i", str(file_path)]
-        res = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="ignore")
+        res = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="ignore", timeout=15)
         output = res.stderr or ""
 
         is_h264 = False
         is_aac = False
         has_video = False
+        has_audio = False
 
         for line in output.splitlines():
             if "Stream #" in line:
@@ -183,20 +184,21 @@ def ensure_mobile_compatible_mp4(file_path: str) -> str:
                     if any(c in line.lower() for c in ["h264", "avc1"]):
                         is_h264 = True
                 if "Audio:" in line:
+                    has_audio = True
                     if any(c in line.lower() for c in ["aac", "mp4a"]):
                         is_aac = True
 
         if not has_video:
             return file_path
 
-        # If already standard H.264 video and AAC audio, it's 100% gallery ready
-        if is_h264 and is_aac:
+        # If already standard H.264 video and AAC audio (or video has no audio), it's 100% gallery ready
+        if is_h264 and (is_aac or not has_audio):
             return file_path
 
         temp_out = file_path + ".compat.mp4"
 
-        if is_h264 and not is_aac:
-            # Video is already H.264, only transcode audio stream to AAC (instant, ~1 sec)
+        if is_h264 and has_audio and not is_aac:
+            # Video is already H.264, only transcode audio stream to AAC (instant, ~0.5 sec)
             conv_cmd = [
                 str(ffmpeg_exe), "-y", "-i", str(file_path),
                 "-c:v", "copy",
@@ -205,16 +207,16 @@ def ensure_mobile_compatible_mp4(file_path: str) -> str:
                 temp_out
             ]
         else:
-            # Video is AV1, VP9 or non-h264 -> convert to universally compatible H.264 + AAC + yuv420p
+            # Video is AV1, VP9 or non-h264 -> convert using ultrafast preset to avoid long delays
             conv_cmd = [
                 str(ffmpeg_exe), "-y", "-i", str(file_path),
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p",
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-threads", "0",
                 "-c:a", "aac", "-b:a", "192k",
                 "-movflags", "+faststart",
                 temp_out
             ]
 
-        proc = subprocess.run(conv_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        proc = subprocess.run(conv_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120)
         if proc.returncode == 0 and os.path.exists(temp_out) and os.path.getsize(temp_out) > 0:
             os.replace(temp_out, file_path)
         elif os.path.exists(temp_out):
@@ -590,7 +592,7 @@ async def get_media_info(payload: InfoRequest):
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl_inst:
             for h in available_heights:
-                fmt_spec = f"bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
+                fmt_spec = f"best[height<={h}][ext=mp4][vcodec^=avc1]/bestvideo[height<={h}][vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo[height<={h}][vcodec^=avc1]+bestaudio/bestvideo[height<={h}]+bestaudio[acodec^=mp4a]/bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
                 try:
                     selector = ydl_inst.build_format_selector(fmt_spec)
                     selected_fmts = list(selector({'formats': formats}))
@@ -924,14 +926,18 @@ def run_yt_dlp_download(
         })
     else:
         if format_id == 'best':
-            ydl_opts['format'] = 'bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo+bestaudio/best'
+            ydl_opts['format'] = 'best[ext=mp4][vcodec^=avc1]/bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo[vcodec^=avc1]+bestaudio/bestvideo+bestaudio/best'
         elif '+bestaudio' in format_id or 'bestvideo' in format_id:
-            ydl_opts['format'] = format_id
+            if 'vcodec' not in format_id:
+                v_part = format_id.split('+')[0]
+                ydl_opts['format'] = f"best[ext=mp4][vcodec^=avc1]/{v_part}[vcodec^=avc1]+bestaudio[acodec^=mp4a]/{v_part}[vcodec^=avc1]+bestaudio/{format_id}/best"
+            else:
+                ydl_opts['format'] = format_id
         else:
-            ydl_opts['format'] = f"{format_id}+bestaudio/bestvideo+bestaudio/{format_id}/best"
+            ydl_opts['format'] = f"best[ext=mp4][vcodec^=avc1]/{format_id}+bestaudio[acodec^=mp4a]/{format_id}+bestaudio/{format_id}/best"
         ydl_opts['merge_output_format'] = 'mp4'
         ydl_opts['postprocessor_args'] = {
-            'Merger': ['-c:a', 'aac', '-movflags', '+faststart']
+            'Merger': ['-c:v', 'copy', '-c:a', 'aac', '-movflags', '+faststart']
         }
 
     res = None
