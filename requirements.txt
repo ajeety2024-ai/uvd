@@ -3,4 +3,4 @@ uvicorn>=0.28.0
 yt-dlp>=2024.3.10
 requests>=2.31.0
 python-multipart>=0.0.9
-pywebview>=5.0.0
+imageio-ffmpeg>=0.4.9
