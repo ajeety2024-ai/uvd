@@ -197,26 +197,17 @@ def ensure_mobile_compatible_mp4(file_path: str) -> str:
 
         temp_out = file_path + ".compat.mp4"
 
-        if is_h264 and has_audio and not is_aac:
-            # Video is already H.264, only transcode audio stream to AAC (instant, ~0.5 sec)
-            conv_cmd = [
-                str(ffmpeg_exe), "-y", "-i", str(file_path),
-                "-c:v", "copy",
-                "-c:a", "aac", "-b:a", "192k",
-                "-movflags", "+faststart",
-                temp_out
-            ]
-        else:
-            # Video is AV1, VP9 or non-h264 -> convert using ultrafast preset to avoid long delays
-            conv_cmd = [
-                str(ffmpeg_exe), "-y", "-i", str(file_path),
-                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p", "-threads", "0",
-                "-c:a", "aac", "-b:a", "192k",
-                "-movflags", "+faststart",
-                temp_out
-            ]
+        # Stream copy video (-c:v copy) so we never block CPU or pause at 99%.
+        # Only transcode audio if needed, and apply +faststart for instant mobile playback.
+        conv_cmd = [
+            str(ffmpeg_exe), "-y", "-i", str(file_path),
+            "-c:v", "copy",
+            "-c:a", "aac" if (has_audio and not is_aac) else "copy",
+            "-movflags", "+faststart",
+            temp_out
+        ]
 
-        proc = subprocess.run(conv_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120)
+        proc = subprocess.run(conv_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=25)
         if proc.returncode == 0 and os.path.exists(temp_out) and os.path.getsize(temp_out) > 0:
             os.replace(temp_out, file_path)
         elif os.path.exists(temp_out):
@@ -592,10 +583,10 @@ async def get_media_info(payload: InfoRequest):
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl_inst:
             for h in available_heights:
-                fmt_spec = f"best[height<={h}][ext=mp4][vcodec^=avc1]/bestvideo[height<={h}][vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo[height<={h}][vcodec^=avc1]+bestaudio/bestvideo[height<={h}]+bestaudio[acodec^=mp4a]/bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
+                fmt_spec = f"bestvideo[height<={h}][vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo[height<={h}][vcodec^=avc1]+bestaudio/bestvideo[height<={h}]+bestaudio[acodec^=mp4a]/bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
                 try:
                     selector = ydl_inst.build_format_selector(fmt_spec)
-                    selected_fmts = list(selector({'formats': formats}))
+                    selected_fmts = list(selector({'formats': formats, 'incomplete_formats': False}))
                 except Exception:
                     selected_fmts = []
 
@@ -651,23 +642,29 @@ async def get_media_info(payload: InfoRequest):
         # Fallback for progressive / single-stream platforms (Twitter, TikTok, etc.)
         if not video_options:
             seen_res = set()
-            for f in formats:
-                vcodec = f.get('vcodec', 'none')
-                if vcodec != 'none' and vcodec:
-                    h = f.get('height') or 720
-                    key = f"{h}p"
-                    if key not in seen_res:
-                        seen_res.add(key)
-                        sz = f.get('filesize') or f.get('filesize_approx') or int(((f.get('tbr') or f.get('vbr') or 1200) * 1024 / 8) * duration)
-                        f_id = f.get('format_id')
-                        video_options.append({
-                            'format_id': f_id,
-                            'height': h,
-                            'quality': f"{h}p HD" if h >= 720 else f"{h}p SD",
-                            'ext': 'mp4',
-                            'size': format_bytes(sz),
-                            'is_audio': False
-                        })
+            h264_formats = sorted(
+                [f for f in formats if f.get('vcodec') and f.get('vcodec') != 'none'],
+                key=lambda x: (
+                    1 if any(c in str(x.get('vcodec', '')).lower() for c in ['avc1', 'h264']) else 0,
+                    x.get('height') or 0
+                ),
+                reverse=True
+            )
+            for f in h264_formats:
+                h = f.get('height') or 720
+                key = f"{h}p"
+                if key not in seen_res:
+                    seen_res.add(key)
+                    sz = f.get('filesize') or f.get('filesize_approx') or int(((f.get('tbr') or f.get('vbr') or 1200) * 1024 / 8) * duration)
+                    f_id = f.get('format_id')
+                    video_options.append({
+                        'format_id': f_id,
+                        'height': h,
+                        'quality': f"{h}p HD" if h >= 720 else f"{h}p SD",
+                        'ext': 'mp4',
+                        'size': format_bytes(sz),
+                        'is_audio': False
+                    })
             video_options.sort(key=lambda x: x['height'], reverse=True)
 
         if not video_options:
