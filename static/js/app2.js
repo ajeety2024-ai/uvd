@@ -15,36 +15,55 @@ window._UVD_AUTHOR_SIGNATURE = Object.freeze({
   token: "uvd_sec_token_98432a_ajeet_yadav"
 });
 
-// Safe Storage Wrapper (Prevents "localStorage access is denied" SecurityError in Android Chrome/WebAPK)
+// Bulletproof Safe Storage Wrapper (Prevents "localStorage access is denied" SecurityError in Android Chrome/WebAPK/Private Mode)
+let _isLocalStorageWorking = false;
+try {
+  if (typeof window !== 'undefined' && 'localStorage' in window) {
+    window.localStorage.setItem('__uvd_test__', '1');
+    window.localStorage.removeItem('__uvd_test__');
+    _isLocalStorageWorking = true;
+  }
+} catch (e) {
+  _isLocalStorageWorking = false;
+}
+
 const safeStorage = {
   _mem: {},
   getItem(key) {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(key);
-      }
-    } catch (e) {}
+    if (_isLocalStorageWorking) {
+      try { return window.localStorage.getItem(key); } catch (e) {}
+    }
     return this._mem[key] !== undefined ? this._mem[key] : null;
   },
   setItem(key, value) {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(key, value);
-        return;
-      }
-    } catch (e) {}
+    if (_isLocalStorageWorking) {
+      try { window.localStorage.setItem(key, value); return; } catch (e) {}
+    }
     this._mem[key] = String(value);
   },
   removeItem(key) {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.removeItem(key);
-        return;
-      }
-    } catch (e) {}
+    if (_isLocalStorageWorking) {
+      try { window.localStorage.removeItem(key); return; } catch (e) {}
+    }
     delete this._mem[key];
   }
 };
+
+// Polyfill window.localStorage if inaccessible so external code never throws
+if (!_isLocalStorageWorking && typeof window !== 'undefined') {
+  try {
+    Object.defineProperty(window, 'localStorage', {
+      value: {
+        getItem: (k) => safeStorage.getItem(k),
+        setItem: (k, v) => safeStorage.setItem(k, v),
+        removeItem: (k) => safeStorage.removeItem(k),
+        clear: () => { safeStorage._mem = {}; }
+      },
+      configurable: true,
+      writable: true
+    });
+  } catch (e) {}
+}
 
 // OmniDownloader Safe Icon Renderer
 function safeCreateIcons() {
@@ -678,6 +697,8 @@ function dismissPlaylistView() {
   if (playlistSection) {
     playlistSection.classList.add('hidden');
   }
+  const quickFormatContainer = document.getElementById('quickFormatContainer');
+  if (quickFormatContainer) quickFormatContainer.classList.add('hidden');
   currentPlaylistData = null;
   if (playlistItemsList) {
     playlistItemsList.innerHTML = '';
@@ -694,6 +715,8 @@ function dismissResultView() {
   if (resultSection) {
     resultSection.classList.add('hidden');
   }
+  const quickFormatContainer = document.getElementById('quickFormatContainer');
+  if (quickFormatContainer) quickFormatContainer.classList.add('hidden');
   currentMediaData = null;
   if (videoFormatsList) videoFormatsList.innerHTML = '';
   if (audioFormatsList) audioFormatsList.innerHTML = '';
@@ -745,6 +768,8 @@ function setupEventListeners() {
     resultSection.classList.add('hidden');
     playlistSection.classList.add('hidden');
     errorSection.classList.add('hidden');
+    const quickFormatContainer = document.getElementById('quickFormatContainer');
+    if (quickFormatContainer) quickFormatContainer.classList.add('hidden');
     currentPlaylistData = null;
     currentMediaData = null;
     urlInput.focus();
@@ -971,6 +996,16 @@ function setupEventListeners() {
     manualCheckUpdateBtn.addEventListener('click', () => checkAppUpdates(true));
   }
 
+  const supportedPlatformsContainer = document.getElementById('supportedPlatformsContainer');
+  if (supportedPlatformsContainer) {
+    // Completely hide platform chips on mobile devices (only show on desktop/laptop)
+    if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768) {
+      supportedPlatformsContainer.classList.add('hidden');
+      supportedPlatformsContainer.classList.remove('flex', 'md:flex');
+      supportedPlatformsContainer.style.setProperty('display', 'none', 'important');
+    }
+  }
+
   document.querySelectorAll('.platform-quick-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const hint = btn.getAttribute('data-hint');
@@ -1114,6 +1149,12 @@ async function fetchMediaInfo(url) {
 
     loadingSection.classList.add('hidden');
 
+    // Show quick format switcher (MP4 Video / MP3 Audio) ONLY after media is successfully fetched
+    const quickFormatContainer = document.getElementById('quickFormatContainer');
+    if (quickFormatContainer) {
+      quickFormatContainer.classList.remove('hidden');
+    }
+
     if (data.is_playlist) {
       currentPlaylistData = data;
       renderPlaylistView(data);
@@ -1134,6 +1175,10 @@ async function fetchMediaInfo(url) {
 
   } catch (err) {
     loadingSection.classList.add('hidden');
+    const quickFormatContainer = document.getElementById('quickFormatContainer');
+    if (quickFormatContainer) {
+      quickFormatContainer.classList.add('hidden');
+    }
     errorSection.classList.remove('hidden');
     errorMessage.textContent = err.message || 'Something went wrong while processing the link.';
   } finally {
@@ -1373,6 +1418,8 @@ async function startSingleDownload() {
 
   // Hide result card and clear URL input after initiating download
   if (resultSection) resultSection.classList.add('hidden');
+  const quickFormatContainer = document.getElementById('quickFormatContainer');
+  if (quickFormatContainer) quickFormatContainer.classList.add('hidden');
   if (urlInput) urlInput.value = '';
   currentMediaData = null;
 }
@@ -1400,6 +1447,8 @@ function startPlaylistBatchQueue() {
   }
 
   activeQueue = selectedItems;
+  const quickFormatContainer = document.getElementById('quickFormatContainer');
+  if (quickFormatContainer) quickFormatContainer.classList.add('hidden');
   renderPanelActiveTasks();
   openDownloadManagerModal();
   startNextQueueItem();
@@ -2592,6 +2641,8 @@ function hideAllSections() {
   playlistSection.classList.add('hidden');
   loadingSection.classList.add('hidden');
   errorSection.classList.add('hidden');
+  const quickFormatContainer = document.getElementById('quickFormatContainer');
+  if (quickFormatContainer) quickFormatContainer.classList.add('hidden');
 }
 
 /* ==========================================================================
