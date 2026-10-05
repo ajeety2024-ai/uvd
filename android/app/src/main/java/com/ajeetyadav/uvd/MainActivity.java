@@ -34,7 +34,7 @@ public class MainActivity extends AppCompatActivity {
     private SharedPreferences prefs;
 
     // Default Live Server URL (Updated dynamically via SharedPreferences or Remote Config)
-    public static final String DEFAULT_SERVER_URL = "https://addressing-impressed-brass-publications.trycloudflare.com";
+    public static final String DEFAULT_SERVER_URL = "https://uvd-mmt6.onrender.com";
     private static final String PREF_KEY_SERVER_URL = "uvd_server_url";
 
     @SuppressLint("SetJavaScriptEnabled")
