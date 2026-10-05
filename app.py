@@ -155,6 +155,78 @@ try:
 except Exception:
     FFMPEG_PATH = None
 
+if not FFMPEG_PATH or not os.path.exists(str(FFMPEG_PATH)):
+    FFMPEG_PATH = shutil.which("ffmpeg")
+
+def ensure_mobile_compatible_mp4(file_path: str) -> str:
+    """Ensures the MP4 video is 100% playable in native Android Gallery and iOS Photos.
+    If the video is encoded in AV1 (av01) or VP9 (vp09/vp9) or uses Opus audio,
+    native Android MediaCodec displays a black screen with audio only.
+    This helper detects and converts to standard H.264 (yuv420p) + AAC with +faststart."""
+    ffmpeg_exe = FFMPEG_PATH or shutil.which("ffmpeg")
+    if not ffmpeg_exe or not os.path.exists(file_path) or not file_path.lower().endswith(".mp4"):
+        return file_path
+
+    try:
+        probe_cmd = [str(ffmpeg_exe), "-i", str(file_path)]
+        res = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="ignore")
+        output = res.stderr or ""
+
+        is_h264 = False
+        is_aac = False
+        has_video = False
+
+        for line in output.splitlines():
+            if "Stream #" in line:
+                if "Video:" in line:
+                    has_video = True
+                    if any(c in line.lower() for c in ["h264", "avc1"]):
+                        is_h264 = True
+                if "Audio:" in line:
+                    if any(c in line.lower() for c in ["aac", "mp4a"]):
+                        is_aac = True
+
+        if not has_video:
+            return file_path
+
+        # If already standard H.264 video and AAC audio, it's 100% gallery ready
+        if is_h264 and is_aac:
+            return file_path
+
+        temp_out = file_path + ".compat.mp4"
+
+        if is_h264 and not is_aac:
+            # Video is already H.264, only transcode audio stream to AAC (instant, ~1 sec)
+            conv_cmd = [
+                str(ffmpeg_exe), "-y", "-i", str(file_path),
+                "-c:v", "copy",
+                "-c:a", "aac", "-b:a", "192k",
+                "-movflags", "+faststart",
+                temp_out
+            ]
+        else:
+            # Video is AV1, VP9 or non-h264 -> convert to universally compatible H.264 + AAC + yuv420p
+            conv_cmd = [
+                str(ffmpeg_exe), "-y", "-i", str(file_path),
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "22", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", "-b:a", "192k",
+                "-movflags", "+faststart",
+                temp_out
+            ]
+
+        proc = subprocess.run(conv_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if proc.returncode == 0 and os.path.exists(temp_out) and os.path.getsize(temp_out) > 0:
+            os.replace(temp_out, file_path)
+        elif os.path.exists(temp_out):
+            try:
+                os.remove(temp_out)
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"Error ensuring mobile compatibility for {file_path}: {e}")
+
+    return file_path
+
 COOKIES_FILE = APP_DATA_DIR / "cookies.txt"
 
 def auto_extract_firefox_cookies() -> bool:
@@ -194,6 +266,9 @@ def get_base_ydl_opts() -> dict:
     opts = {
         'quiet': True,
         'no_warnings': True,
+        # Universal mobile & desktop compatibility:
+        # Prioritize standard H.264 (avc1) video and AAC (m4a) audio in MP4 container for 100% Android Gallery & iOS compatibility
+        'format_sort': ['vcodec:h264', 'res', 'acodec:m4a', 'vcodec:avc', 'acodec:aac'],
     }
     if FFMPEG_PATH:
         opts['ffmpeg_location'] = FFMPEG_PATH
@@ -849,12 +924,15 @@ def run_yt_dlp_download(
         })
     else:
         if format_id == 'best':
-            ydl_opts['format'] = 'bestvideo+bestaudio/best'
+            ydl_opts['format'] = 'bestvideo[vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo+bestaudio/best'
         elif '+bestaudio' in format_id or 'bestvideo' in format_id:
             ydl_opts['format'] = format_id
         else:
             ydl_opts['format'] = f"{format_id}+bestaudio/bestvideo+bestaudio/{format_id}/best"
         ydl_opts['merge_output_format'] = 'mp4'
+        ydl_opts['postprocessor_args'] = {
+            'Merger': ['-c:a', 'aac', '-movflags', '+faststart']
+        }
 
     res = None
     try:
@@ -900,6 +978,8 @@ def run_yt_dlp_download(
         actual_file = base + ".mp3"
     else:
         actual_file = base + ".mp4" if os.path.exists(base + ".mp4") else downloaded_file
+        # Ensure 100% Android Gallery & iOS compatibility (H.264 + AAC + faststart)
+        actual_file = ensure_mobile_compatible_mp4(actual_file)
 
     final_thumb = thumbnail or res.get('thumbnail') or (res.get('thumbnails')[-1]['url'] if res.get('thumbnails') else '')
 
@@ -1084,6 +1164,10 @@ async def download_file_direct(filename: Optional[str] = None, req: Request = No
 
     if not file_path.exists() or not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
+    
+    # Ensure MP4 file is universally compatible with Android Gallery and iOS
+    if file_path.suffix.lower() == ".mp4":
+        file_path = Path(ensure_mobile_compatible_mp4(str(file_path)))
     
     is_audio = file_path.suffix.lower() in [".mp3", ".m4a", ".wav", ".aac", ".opus", ".ogg", ".flac"]
     ascii_clean = re.sub(r'[^\x20-\x7E]', '_', file_path.name)
