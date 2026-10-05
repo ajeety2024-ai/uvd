@@ -2335,7 +2335,7 @@ function renderFilteredHistoryList() {
             <span>Play</span>
           </button>
           
-          ${!window.pywebview ? `
+          ${/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? `
           <a href="/api/file?filename=${encodeURIComponent(item.name)}&download=1" download="${item.name}" class="btn-save-phone px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-semibold flex items-center space-x-1 transition-all" title="Save directly to phone gallery" onclick="event.stopPropagation()">
             <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>Save</span>
@@ -2539,9 +2539,17 @@ window.deleteDownloadedFile = async function(filename) {
   });
   if (confirmed) {
     try {
-      let res = await fetch(`/api/downloads?filename=${encodeURIComponent(filename)}`, {
+      // 1. Path param first: /api/downloads/{filename} (Supported by UVD.exe on Windows & Render backend)
+      let res = await fetch(`/api/downloads/${encodeURIComponent(filename)}`, {
         method: 'DELETE'
       });
+      // 2. Query param fallback: /api/downloads?filename=...
+      if (!res.ok && (res.status === 405 || res.status === 404)) {
+        res = await fetch(`/api/downloads?filename=${encodeURIComponent(filename)}`, {
+          method: 'DELETE'
+        });
+      }
+      // 3. POST fallback: /api/downloads/delete
       if (!res.ok && (res.status === 405 || res.status === 404)) {
         res = await fetch(`/api/downloads/delete`, {
           method: 'POST',
