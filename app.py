@@ -1225,8 +1225,10 @@ async def show_in_folder(payload: Dict[str, str]):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/downloads")
-@app.delete("/api/downloads/{filename}")
+@app.delete("/api/downloads/{filename:path}")
+@app.post("/api/downloads")
 @app.post("/api/downloads/delete")
+@app.post("/api/downloads/delete/{filename:path}")
 async def delete_downloaded_file(filename: Optional[str] = None, req: Request = None):
     target_name = filename
     if not target_name and req:
@@ -1300,10 +1302,10 @@ async def list_local_downloads():
         ext = f.suffix.lower()
         if ext not in allowed_exts:
             continue
-        # Skip temporary, unmerged or intermediate stream format chunks (e.g. .f251.webm, .f399.mp4)
+        # Skip temporary, unmerged or intermediate stream format chunks (e.g. .f251.webm, .f399.mp4, .compat.mp4)
         if re.search(r'\.f[0-9a-zA-Z_-]+\.(mp4|webm|m4a|mkv)$', f.name):
             continue
-        if f.name.endswith(".part") or f.name.endswith(".ytdl") or f.name.endswith(".tmp"):
+        if f.name.endswith(".part") or f.name.endswith(".ytdl") or f.name.endswith(".tmp") or f.name.endswith(".compat.mp4"):
             continue
 
         stat = f.stat()
