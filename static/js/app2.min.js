@@ -930,6 +930,13 @@ function setupEventListeners() {
   if (modalCloseBtn) modalCloseBtn.addEventListener('click', minimizeDownloadManagerModal);
   if (modalDoneBtn) modalDoneBtn.addEventListener('click', minimizeDownloadManagerModal);
   if (floatingDownloadPill) floatingDownloadPill.addEventListener('click', openDownloadManagerModal);
+  if (downloadManagerModal) {
+    downloadManagerModal.addEventListener('click', (e) => {
+      if (e.target === downloadManagerModal) {
+        minimizeDownloadManagerModal();
+      }
+    });
+  }
 
   // Spotlight Actions
   if (activePauseResumeBtn) activePauseResumeBtn.addEventListener('click', toggleCurrentDownloadPause);
@@ -1484,24 +1491,14 @@ async function startNextQueueItem() {
     isQueueRunning = false;
     currentActiveItem = null;
     currentActiveTaskId = null;
+    activeQueue = activeQueue.filter(i => i.status !== 'completed');
     renderSpotlightCard(null);
     renderModalQueueList();
     renderPanelActiveTasks();
     updateModalHeader();
 
-    // Automatically remove completed items and auto-dismiss modal when queue finishes
-    setTimeout(() => {
-      activeQueue = activeQueue.filter(i => i.status !== 'completed');
-      renderModalQueueList();
-      renderPanelActiveTasks();
-      updateModalHeader();
-
-      if (!isQueueRunning && (!activeQueue.length || activeQueue.every(i => i.status === 'completed'))) {
-        downloadManagerModal.classList.add('hidden');
-        downloadManagerModal.classList.remove('open');
-        floatingDownloadPill.classList.add('hidden');
-      }
-    }, 1200);
+    // Immediately close and hide popup modal so it never lingers after completion
+    minimizeDownloadManagerModal();
 
     // Auto Shutdown PC if enabled in settings
     if (appSettings.auto_shutdown) {
@@ -1625,14 +1622,28 @@ function pollActiveDownload(taskId, item) {
         renderModalQueueList();
         updateModalHeader();
 
-        // Automatically remove completed item from active queue after brief display
-        const completedItemId = item.id;
-        setTimeout(() => {
+        // Check if there are any remaining pending items in the active queue
+        const remainingPending = activeQueue.filter(i => (i.status === 'pending' || i.status === 'paused') && i.id !== item.id);
+
+        if (remainingPending.length === 0) {
+          // All downloads done! Immediately close and dismiss popup modal so it never lingers
+          minimizeDownloadManagerModal();
+          isQueueRunning = false;
+          currentActiveItem = null;
+          currentActiveTaskId = null;
+          activeQueue = [];
+          renderSpotlightCard(null);
+          renderModalQueueList();
+          renderPanelActiveTasks();
+          updateModalHeader();
+        } else {
+          // If batch queue still has more items, remove this completed item and continue
+          const completedItemId = item.id;
           activeQueue = activeQueue.filter(i => i.id !== completedItemId);
           renderModalQueueList();
           renderPanelActiveTasks();
           updateModalHeader();
-        }, 1200);
+        }
 
         const isMobileOrWeb = !window.pywebview;
         if (isMobileOrWeb && data.filename) {
@@ -1656,7 +1667,9 @@ function pollActiveDownload(taskId, item) {
           document.body.removeChild(a);
         }
 
-        setTimeout(startNextQueueItem, 1000);
+        if (remainingPending.length > 0) {
+          setTimeout(startNextQueueItem, 1000);
+        }
 
       } else if (data.status === 'error') {
         clearInterval(activePollInterval);
@@ -1739,10 +1752,13 @@ function minimizeDownloadManagerModal() {
     downloadManagerModal.classList.remove('open');
     downloadManagerModal.style.setProperty('display', 'none', 'important');
     downloadManagerModal.style.setProperty('visibility', 'hidden', 'important');
+    downloadManagerModal.style.setProperty('opacity', '0', 'important');
     downloadManagerModal.style.setProperty('pointer-events', 'none', 'important');
   }
   if (isQueueRunning && currentActiveItem) {
     if (floatingDownloadPill) floatingDownloadPill.classList.remove('hidden');
+  } else {
+    if (floatingDownloadPill) floatingDownloadPill.classList.add('hidden');
   }
   safeCreateIcons();
 }
