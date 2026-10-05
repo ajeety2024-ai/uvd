@@ -2539,9 +2539,16 @@ window.deleteDownloadedFile = async function(filename) {
   });
   if (confirmed) {
     try {
-      const res = await fetch(`/api/downloads?filename=${encodeURIComponent(filename)}`, {
+      let res = await fetch(`/api/downloads?filename=${encodeURIComponent(filename)}`, {
         method: 'DELETE'
       });
+      if (!res.ok && (res.status === 405 || res.status === 404)) {
+        res = await fetch(`/api/downloads/delete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: filename })
+        });
+      }
       if (res.ok) {
         showAppToast("File deleted successfully.", "Deleted", "success");
         await loadDownloadsHistory();
