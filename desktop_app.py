@@ -11,8 +11,13 @@ BASE_DIR = Path(__file__).resolve().parent
 ICON_PATH = str(BASE_DIR / "icon.ico")
 WINDOW_TITLE = "UVD - Universal Video Downloader"
 
-# Set explicit Windows App User Model ID so Taskbar shows dedicated UVD icon
+# Prevent WebView2 screen flickering / blinking on Windows laptops (AMD Radeon / Intel GPUs)
 if sys.platform == "win32":
+    existing_args = os.environ.get("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "")
+    flags = "--disable-gpu-compositing --disable-direct-composition --disable-features=CalculateNativeWinOcclusion"
+    if flags not in existing_args:
+        os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"{existing_args} {flags}".strip()
+
     try:
         app_id = "uvd.universal.video.downloader.app"
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
