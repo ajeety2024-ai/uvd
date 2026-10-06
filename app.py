@@ -490,7 +490,114 @@ def detect_platform(url: str) -> Dict[str, str]:
         return {"name": "Vimeo", "icon": "vimeo", "color": "#1AB7EA"}
     elif "linkedin.com" in url_lower:
         return {"name": "LinkedIn", "icon": "linkedin", "color": "#0A66C2"}
-    return {"name": "Universal Video", "icon": "video", "color": "#6366F1"}
+    
+    try:
+        parsed = urllib.parse.urlparse(url)
+        domain = parsed.netloc.replace("www.", "").capitalize()
+        if domain:
+            return {"name": f"{domain} (Web)", "icon": "globe", "color": "#6366F1"}
+    except Exception:
+        pass
+
+    return {"name": "Universal Web Video", "icon": "video", "color": "#6366F1"}
+
+def sniff_generic_web_media(url: str) -> Optional[Dict[str, Any]]:
+    """
+    Scans a generic web page or movie site for HTML5 video tags, M3U8 streams,
+    MPD manifests, embedded IFrames, and direct video links when standard extraction fails.
+    """
+    clean_url = url.strip()
+    if not clean_url:
+        return None
+
+    # Direct Video Stream URL Detection (.m3u8, .mpd, .mp4, etc.)
+    if re.search(r'\.(m3u8|mpd|mp4|webm|mkv|mov|avi)(\?.*)?$', clean_url, re.IGNORECASE):
+        ext = 'mp4'
+        if '.m3u8' in clean_url.lower(): ext = 'm3u8'
+        elif '.mpd' in clean_url.lower(): ext = 'mpd'
+        
+        parsed = urllib.parse.urlparse(clean_url)
+        site_name = parsed.netloc.replace('www.', '').capitalize() or "Web Video"
+        file_stem = Path(parsed.path).stem or "Direct Stream"
+        
+        return {
+            "title": f"{site_name} - {file_stem}",
+            "stream_url": clean_url,
+            "is_direct": True,
+            "ext": ext,
+            "site_name": site_name
+        }
+
+    # Web Page HTML Scraper & Deep Media Link Extractor
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+    }
+    parsed = urllib.parse.urlparse(clean_url)
+    if parsed.netloc:
+        headers["Referer"] = f"{parsed.scheme}://{parsed.netloc}/"
+
+    try:
+        req = urllib.request.Request(clean_url, headers=headers)
+        with urllib.request.urlopen(req, timeout=6) as response:
+            if response.status != 200:
+                return None
+            html_text = response.read().decode('utf-8', errors='ignore')
+    except Exception:
+        return None
+
+    site_name = parsed.netloc.replace('www.', '').capitalize() or "Web Video"
+    title_match = re.search(r'<title[^>]*>(.*?)</title>', html_text, re.IGNORECASE | re.DOTALL)
+    page_title = title_match.group(1).strip() if title_match else site_name
+    page_title = re.sub(r'[\r\n\t]+', ' ', page_title)[:80].strip()
+
+    # 1. Search for HLS .m3u8 links
+    m3u8_matches = re.findall(r'https?://[^\s"\'<>]+\.m3u8[^\s"\'<>]*', html_text, re.IGNORECASE)
+    if m3u8_matches:
+        return {
+            "title": page_title,
+            "stream_url": m3u8_matches[0],
+            "is_direct": True,
+            "ext": "m3u8",
+            "site_name": site_name
+        }
+
+    # 2. Search for direct HTML5 video / source tags
+    source_matches = re.findall(r'<source[^>]+src=["\']([^"\']+)["\']', html_text, re.IGNORECASE)
+    video_matches = re.findall(r'<video[^>]+src=["\']([^"\']+)["\']', html_text, re.IGNORECASE)
+    all_sources = source_matches + video_matches
+    for src in all_sources:
+        if src.startswith('//'):
+            src = f"{parsed.scheme}:{src}"
+        elif src.startswith('/'):
+            src = f"{parsed.scheme}://{parsed.netloc}{src}"
+        if src.startswith('http'):
+            return {
+                "title": page_title,
+                "stream_url": src,
+                "is_direct": True,
+                "ext": "mp4",
+                "site_name": site_name
+            }
+
+    # 3. Search for embedded IFrame video players (StreamTape, FileMoon, MixDrop, Voe, DoodStream, etc.)
+    iframe_matches = re.findall(r'<iframe[^>]+src=["\']([^"\']+)["\']', html_text, re.IGNORECASE)
+    for iframe_src in iframe_matches:
+        if iframe_src.startswith('//'):
+            iframe_src = f"{parsed.scheme}:{iframe_src}"
+        elif iframe_src.startswith('/'):
+            iframe_src = f"{parsed.scheme}://{parsed.netloc}{iframe_src}"
+        if any(h in iframe_src.lower() for h in ['streamtape', 'filemoon', 'mixdrop', 'voe', 'dood', 'stream', 'embed', 'player', 'video']):
+            return {
+                "title": page_title,
+                "stream_url": iframe_src,
+                "is_iframe": True,
+                "ext": "mp4",
+                "site_name": site_name
+            }
+
+    return None
 
 def format_bytes(size: Optional[float]) -> str:
     if not size or size <= 0:
@@ -572,8 +679,70 @@ async def get_media_info(payload: InfoRequest):
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 return ydl.extract_info(url, download=False)
 
-        
-        info = await loop.run_in_executor(None, extract)
+        info = None
+        try:
+            info = await loop.run_in_executor(None, extract)
+        except Exception as primary_err:
+            # Fallback to Deep Web Sniffer if primary yt_dlp extraction failed
+            sniffed = sniff_generic_web_media(url)
+            if sniffed and sniffed.get("stream_url"):
+                target_stream = sniffed["stream_url"]
+                def extract_sniffed():
+                    custom_opts = get_base_ydl_opts()
+                    custom_opts.update({
+                        'skip_download': True,
+                        'http_headers': {
+                            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                            'Referer': url
+                        }
+                    })
+                    with yt_dlp.YoutubeDL(custom_opts) as ydl2:
+                        return ydl2.extract_info(target_stream, download=False)
+                try:
+                    info = await loop.run_in_executor(None, extract_sniffed)
+                    if info:
+                        if sniffed.get("title") and info.get('title') in ['video', 'Watch', 'index', None, '']:
+                            info['title'] = sniffed["title"]
+                except Exception:
+                    # Synthetic info payload for direct stream or m3u8
+                    info = {
+                        "title": sniffed.get("title") or "Web Video Stream",
+                        "uploader": sniffed.get("site_name") or platform['name'],
+                        "duration": 0,
+                        "thumbnail": "",
+                        "formats": [
+                            {
+                                "format_id": "best",
+                                "url": sniffed["stream_url"],
+                                "ext": sniffed.get("ext", "mp4"),
+                                "height": 1080,
+                                "vcodec": "h264",
+                                "acodec": "aac",
+                                "tbr": 2500
+                            },
+                            {
+                                "format_id": "720p",
+                                "url": sniffed["stream_url"],
+                                "ext": sniffed.get("ext", "mp4"),
+                                "height": 720,
+                                "vcodec": "h264",
+                                "acodec": "aac",
+                                "tbr": 1200
+                            },
+                            {
+                                "format_id": "480p",
+                                "url": sniffed["stream_url"],
+                                "ext": sniffed.get("ext", "mp4"),
+                                "height": 480,
+                                "vcodec": "h264",
+                                "acodec": "aac",
+                                "tbr": 600
+                            }
+                        ]
+                    }
+            if not info:
+                raise primary_err
+
         if not info:
             raise HTTPException(status_code=400, detail="Unable to extract information from this URL.")
 
@@ -989,12 +1158,22 @@ def run_yt_dlp_download(
             record_active_task(task_id, DOWNLOAD_TASKS[task_id])
 
     ydl_opts = get_base_ydl_opts()
+    custom_headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    }
+    if url.startswith('http'):
+        p_dom = urllib.parse.urlparse(url)
+        if p_dom.netloc:
+            custom_headers['Referer'] = f"{p_dom.scheme}://{p_dom.netloc}/"
+
     ydl_opts.update({
         'outtmpl': str(target_dir / f"{file_stem}.%(ext)s"),
         'progress_hooks': [progress_hook],
         'noplaylist': True,
         'continuedl': True,  # Seamless resume for partial .part files
         'noprogress': False,
+        'http_headers': custom_headers,
+        'allow_unplayable_formats': True,
     })
 
     # Range Trimming (Start & End Time)
