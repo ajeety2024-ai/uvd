@@ -49,6 +49,8 @@ button:active, .format-card:active, .btn-primary:active {
 html {
   overflow-y: scroll;
   scrollbar-gutter: stable;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
 }
 
 body {
@@ -57,6 +59,16 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   background-image: none;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Prevent WebView2 DirectComposition buffer flickering on laptop GPUs */
+.glass-panel, header, #downloadsPanel, #resultSection, #playlistSection {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 
 /* ==========================================================================
