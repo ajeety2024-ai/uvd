@@ -912,6 +912,8 @@ def run_yt_dlp_download(
     last_disk_sync = [time.time()]
 
     def progress_hook(d):
+        if DOWNLOAD_TASKS.get(task_id, {}).get("status") == "cancelled":
+            raise Exception("Download cancelled by user")
         if d['status'] == 'downloading':
             total = d.get('total_bytes') or d.get('total_bytes_estimate') or 0
             downloaded = d.get('downloaded_bytes') or 0
@@ -1030,6 +1032,16 @@ def run_yt_dlp_download(
             res = ydl.extract_info(url, download=True)
     except Exception as e:
         err_str = str(e)
+        if DOWNLOAD_TASKS.get(task_id, {}).get("status") == "cancelled" or "cancelled by user" in err_str.lower():
+            remove_active_task(task_id)
+            for pf in target_dir.glob(f"{file_stem}*.*"):
+                if pf.suffix.lower() in [".part", ".ytdl", ".tmp"]:
+                    try:
+                        pf.unlink(missing_ok=True)
+                    except Exception:
+                        pass
+            return
+
         # Auto-recover from HTTP 416 (Requested range not satisfiable) or stale partial download files
         if "416" in err_str or "range not satisfiable" in err_str.lower() or "requested range" in err_str.lower():
             try:
@@ -1143,6 +1155,27 @@ async def delete_active_task_endpoint(task_id: str):
                 except Exception:
                     pass
     return {"success": True, "message": f"Task {task_id} removed"}
+
+@app.post("/api/tasks/cancel-all")
+@app.delete("/api/tasks/all")
+async def cancel_all_active_tasks_endpoint():
+    tasks = load_active_tasks()
+    for tid in list(tasks.keys()):
+        remove_active_task(tid)
+    for tid, tinfo in list(DOWNLOAD_TASKS.items()):
+        tinfo["status"] = "cancelled"
+    
+    target_dir = get_download_dir()
+    for pf in target_dir.glob("*.part"):
+        try: pf.unlink(missing_ok=True)
+        except Exception: pass
+    for pf in target_dir.glob("*.ytdl"):
+        try: pf.unlink(missing_ok=True)
+        except Exception: pass
+    for pf in target_dir.glob("*.tmp"):
+        try: pf.unlink(missing_ok=True)
+        except Exception: pass
+    return {"success": True, "message": "All active download tasks cancelled"}
 
 @app.post("/api/start-download")
 async def start_download_task(payload: StartDownloadRequest, background_tasks: BackgroundTasks):
