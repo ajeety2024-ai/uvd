@@ -27,8 +27,17 @@ from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import yt_dlp
 import imageio_ffmpeg
+import threading
+
+# Asynchronous non-blocking background pre-warming of yt_dlp for instant startup
+def _warmup_ytdlp():
+    try:
+        import yt_dlp
+    except Exception:
+        pass
+
+threading.Thread(target=_warmup_ytdlp, daemon=True).start()
 
 # Hidden Digital Watermark & Cryptographic Author Signature
 UVD_SECURITY_SIGNATURE = {
@@ -510,6 +519,7 @@ def get_file_metadata(filename: str) -> Dict[str, Any]:
 
 @app.post("/api/info")
 async def get_media_info(payload: InfoRequest):
+    import yt_dlp
     url = payload.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL cannot be empty")
@@ -817,6 +827,7 @@ def run_yt_dlp_download(
     end_time: Optional[str] = None,
     download_subtitles: Optional[bool] = False
 ):
+    import yt_dlp
     safe_title = re.sub(r'[\\/*?:"<>|]', "", title or "OmniVideo")[:50].strip() or "video"
     url_hash = hashlib.md5(f"{url}_{format_id}_{is_audio}".encode('utf-8')).hexdigest()[:8]
     file_stem = f"{safe_title}_{url_hash}"
