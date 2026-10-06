@@ -1534,6 +1534,54 @@ window.removeFromQueue = async function(itemId) {
 };
 window.cancelAndRemoveDownload = window.removeFromQueue;
 
+window.cancelAllDownloads = async function() {
+  const activeItems = activeQueue.filter(i => i.status === 'downloading' || i.status === 'pending' || i.status === 'paused' || i.status === 'error');
+  if (activeItems.length === 0) {
+    showAppToast("No active downloads in queue.", "Queue Empty", "info");
+    return;
+  }
+
+  const count = activeItems.length;
+  const confirmed = await showConfirmModal({
+    title: "Cancel All Downloads?",
+    message: `Are you sure you want to cancel and remove all ${count} video${count > 1 ? 's' : ''} from the download queue? All background download progress will be stopped immediately.`,
+    confirmText: `Yes, Cancel All (${count})`,
+    isDanger: true
+  });
+
+  if (!confirmed) return;
+
+  if (activePollInterval) {
+    clearInterval(activePollInterval);
+    activePollInterval = null;
+  }
+
+  const itemIds = activeItems.map(i => i.id || i.task_id).filter(Boolean);
+
+  isQueueRunning = false;
+  currentActiveItem = null;
+  currentActiveTaskId = null;
+  activeQueue = [];
+
+  try {
+    await fetch('/api/tasks/cancel-all', { method: 'POST' });
+  } catch (e) {
+    itemIds.forEach(id => {
+      fetch(`/api/tasks/${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => {});
+    });
+  }
+
+  renderSpotlightCard(null);
+  renderModalQueueList();
+  renderPanelActiveTasks();
+  updateModalHeader();
+  updateDashboardEmptyState();
+
+  minimizeDownloadManagerModal();
+
+  showAppToast(`All ${count} downloads have been cancelled and removed.`, "All Downloads Cancelled", "info");
+};
+
 async function startNextQueueItem() {
   if (activePollInterval) clearInterval(activePollInterval);
 
@@ -1874,6 +1922,21 @@ function renderSpotlightCard(item) {
 
 function renderModalQueueList() {
   modalQueueItemsList.innerHTML = '';
+
+  const modalCancelAllQueueBtn = document.getElementById('modalCancelAllQueueBtn');
+  const modalCancelAllQueueBtnText = document.getElementById('modalCancelAllQueueBtnText');
+  const activeCount = activeQueue.filter(i => i.status === 'downloading' || i.status === 'pending' || i.status === 'paused' || i.status === 'error').length;
+
+  if (modalCancelAllQueueBtn) {
+    if (activeCount > 0) {
+      modalCancelAllQueueBtn.classList.remove('hidden');
+      if (modalCancelAllQueueBtnText) {
+        modalCancelAllQueueBtnText.textContent = `Cancel All (${activeCount})`;
+      }
+    } else {
+      modalCancelAllQueueBtn.classList.add('hidden');
+    }
+  }
 
   if (activeQueue.length === 0) {
     modalQueueItemsList.innerHTML = `
@@ -2236,15 +2299,37 @@ function renderPanelActiveTasks() {
     return;
   }
 
+  const cancelAllQueueBtn = document.getElementById('cancelAllQueueBtn');
+  const cancelAllQueueBtnText = document.getElementById('cancelAllQueueBtnText');
+  const panelCancelAllTopBtn = document.getElementById('panelCancelAllTopBtn');
+  const panelCancelAllTopBtnText = document.getElementById('panelCancelAllTopBtnText');
+
   if (activeItems.length === 0) {
     panelActiveSection.classList.add('hidden');
     if (panelActiveBadge) panelActiveBadge.classList.add('hidden');
+    if (cancelAllQueueBtn) cancelAllQueueBtn.classList.add('hidden');
+    if (panelCancelAllTopBtn) panelCancelAllTopBtn.classList.add('hidden');
     updateDashboardEmptyState();
     return;
   }
 
   panelActiveSection.classList.remove('hidden');
   if (panelActiveBadge) panelActiveBadge.classList.remove('hidden');
+
+  if (cancelAllQueueBtn) {
+    cancelAllQueueBtn.classList.remove('hidden');
+    if (cancelAllQueueBtnText) {
+      cancelAllQueueBtnText.textContent = `Cancel All (${activeItems.length})`;
+    }
+  }
+
+  if (panelCancelAllTopBtn) {
+    panelCancelAllTopBtn.classList.remove('hidden');
+    if (panelCancelAllTopBtnText) {
+      panelCancelAllTopBtnText.textContent = `Cancel All (${activeItems.length})`;
+    }
+  }
+
   panelActiveItemsList.innerHTML = '';
 
   activeItems.forEach(item => {
