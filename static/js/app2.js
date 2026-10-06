@@ -484,8 +484,6 @@ const activeProgressEta = document.getElementById('activeProgressEta');
 const activePauseResumeBtn = document.getElementById('activePauseResumeBtn');
 const activeCancelCurrentBtn = document.getElementById('activeCancelCurrentBtn');
 const activeSkipNextBtn = document.getElementById('activeSkipNextBtn');
-const activeOpenFolderBtn = document.getElementById('activeOpenFolderBtn');
-const activeStopAllBtn = document.getElementById('activeStopAllBtn');
 const modalQueueItemsList = document.getElementById('modalQueueItemsList');
 
 // Settings & New Options Elements
@@ -976,12 +974,6 @@ function setupEventListeners() {
     });
   }
   if (activeSkipNextBtn) activeSkipNextBtn.addEventListener('click', skipToNextInQueue);
-  if (activeStopAllBtn) activeStopAllBtn.addEventListener('click', stopEntireQueue);
-  if (activeOpenFolderBtn) {
-    activeOpenFolderBtn.addEventListener('click', () => {
-      if (openFolderBtn) openFolderBtn.click();
-    });
-  }
 
   // Update Notification & Modal Listeners
   if (navUpdateBadge) {
@@ -1831,9 +1823,29 @@ function updateModalHeader() {
   } else {
     modalStatusSub.textContent = `Download Manager ready • ${pending} items pending`;
   }
+
+  // Skip button only visible if there is another pending item in the queue (playlist/batch)
+  if (activeSkipNextBtn) {
+    const hasNextPending = activeQueue.some(i => (i.status === 'pending' || i.status === 'paused') && (!currentActiveItem || i.id !== currentActiveItem.id));
+    if (hasNextPending) {
+      activeSkipNextBtn.classList.remove('hidden');
+    } else {
+      activeSkipNextBtn.classList.add('hidden');
+    }
+  }
 }
 
 function renderSpotlightCard(item) {
+  // Skip button only visible if there is another pending item in the queue (playlist/batch)
+  if (activeSkipNextBtn) {
+    const hasNextPending = activeQueue.some(i => (i.status === 'pending' || i.status === 'paused') && (!item || i.id !== item.id));
+    if (hasNextPending) {
+      activeSkipNextBtn.classList.remove('hidden');
+    } else {
+      activeSkipNextBtn.classList.add('hidden');
+    }
+  }
+
   if (!item) {
     activeSpotlightThumb.src = 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80';
     activeSpotlightIndex.textContent = '#0';
