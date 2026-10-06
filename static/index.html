@@ -525,6 +525,10 @@
           </div>
 
           <div class="flex items-center space-x-2 self-start sm:self-auto flex-shrink-0">
+            <button id="panelCancelAllTopBtn" type="button" onclick="cancelAllDownloads()" class="hidden px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm" title="Cancel and cut all downloads in queue">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span id="panelCancelAllTopBtnText">Cancel All</span>
+            </button>
             <button id="panelOpenManagerBtn" type="button" class="px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm" title="Open Dedicated Live Download Queue Manager">
               <i data-lucide="activity" class="w-3.5 h-3.5"></i>
               <span>Download Manager</span>
@@ -538,9 +542,15 @@
 
         <!-- Active In-Progress Downloads Section -->
         <div id="panelActiveSection" class="hidden mb-5 space-y-2.5">
-          <div class="text-[11px] font-bold uppercase tracking-wider text-indigo-400 flex items-center space-x-1.5">
-            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Downloading Now</span>
+          <div class="flex items-center justify-between pb-0.5">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-indigo-400 flex items-center space-x-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>Downloading Now</span>
+            </div>
+            <button id="cancelAllQueueBtn" type="button" onclick="cancelAllDownloads()" class="px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm" title="Cancel and remove all downloading videos">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span id="cancelAllQueueBtnText">Cancel All</span>
+            </button>
           </div>
           <div id="panelActiveItemsList" class="space-y-2.5">
           </div>
@@ -720,6 +730,10 @@
               <i data-lucide="layers" class="w-3.5 h-3.5 text-indigo-400"></i>
               <span>Queue Items & Manual Priority Controls</span>
             </h4>
+            <button id="modalCancelAllQueueBtn" type="button" onclick="cancelAllDownloads()" class="hidden px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-white border border-rose-500/30 text-[11px] font-semibold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm" title="Cancel and remove all downloads">
+              <i data-lucide="trash-2" class="w-3 h-3"></i>
+              <span id="modalCancelAllQueueBtnText">Cancel All</span>
+            </button>
           </div>
           
           <div id="modalQueueItemsList" class="space-y-2 max-h-56 overflow-y-auto pr-1">
