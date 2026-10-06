@@ -52,6 +52,17 @@ def start_server():
     from app import app
     uvicorn.run(app, host="127.0.0.1", port=8877, log_level="warning")
 
+def wait_for_server(port=8877, max_seconds=2.5):
+    import socket
+    start_time = time.time()
+    while time.time() - start_time < max_seconds:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.03):
+                return True
+        except (OSError, ConnectionRefusedError):
+            time.sleep(0.015)
+    return False
+
 def main():
     # Start server in background thread
     server_thread = threading.Thread(target=start_server, daemon=True)
@@ -61,7 +72,8 @@ def main():
     icon_thread = threading.Thread(target=set_native_window_icon, daemon=True)
     icon_thread.start()
 
-    time.sleep(1.2)
+    # Fast dynamic socket check: launches as soon as server binds (~40ms) instead of waiting 1.2s
+    wait_for_server(8877)
 
     # Launch Desktop Software Window with UVD Icon
     window = webview.create_window(
