@@ -160,9 +160,9 @@ if not FFMPEG_PATH or not os.path.exists(str(FFMPEG_PATH)):
 
 def ensure_mobile_compatible_mp4(file_path: str) -> str:
     """Ensures the MP4 video is 100% playable in native Android Gallery and iOS Photos.
-    If the video is encoded in AV1 (av01) or VP9 (vp09/vp9) or uses Opus audio,
+    If the video is encoded in AV1 (av01) or VP9 (vp09/vp9) or uses non-standard pixel formats,
     native Android MediaCodec displays a black screen with audio only.
-    This helper detects and converts to standard H.264 (yuv420p) + AAC with +faststart."""
+    This helper detects and ensures standard H.264 (yuv420p) + AAC with +faststart."""
     ffmpeg_exe = FFMPEG_PATH or shutil.which("ffmpeg")
     if not ffmpeg_exe or not os.path.exists(file_path) or not file_path.lower().endswith(".mp4"):
         return file_path
@@ -173,41 +173,57 @@ def ensure_mobile_compatible_mp4(file_path: str) -> str:
         output = res.stderr or ""
 
         is_h264 = False
+        is_yuv420p = False
         is_aac = False
         has_video = False
         has_audio = False
 
         for line in output.splitlines():
             if "Stream #" in line:
-                if "Video:" in line:
+                l_lower = line.lower()
+                if "video:" in l_lower:
                     has_video = True
-                    if any(c in line.lower() for c in ["h264", "avc1"]):
+                    if any(c in l_lower for c in ["h264", "avc1"]):
                         is_h264 = True
-                if "Audio:" in line:
+                    if "yuv420p" in l_lower and "yuv420p10" not in l_lower:
+                        is_yuv420p = True
+                if "audio:" in l_lower:
                     has_audio = True
-                    if any(c in line.lower() for c in ["aac", "mp4a"]):
+                    if any(c in l_lower for c in ["aac", "mp4a"]):
                         is_aac = True
 
         if not has_video:
             return file_path
 
-        # If already standard H.264 video and AAC audio (or video has no audio), it's 100% gallery ready
-        if is_h264 and (is_aac or not has_audio):
+        # If already standard 8-bit H.264 video (yuv420p) and AAC audio (or no audio), it's 100% gallery ready
+        if is_h264 and is_yuv420p and (is_aac or not has_audio):
             return file_path
 
         temp_out = file_path + ".compat.mp4"
 
-        # Stream copy video (-c:v copy) so we never block CPU or pause at 99%.
-        # Only transcode audio if needed, and apply +faststart for instant mobile playback.
-        conv_cmd = [
-            str(ffmpeg_exe), "-y", "-i", str(file_path),
-            "-c:v", "copy",
-            "-c:a", "aac" if (has_audio and not is_aac) else "copy",
-            "-movflags", "+faststart",
-            temp_out
-        ]
+        if is_h264 and is_yuv420p:
+            # Video is already H.264! Just copy video stream and convert audio to AAC with faststart
+            conv_cmd = [
+                str(ffmpeg_exe), "-y", "-i", str(file_path),
+                "-c:v", "copy",
+                "-c:a", "aac" if (has_audio and not is_aac) else "copy",
+                "-movflags", "+faststart",
+                temp_out
+            ]
+            proc = subprocess.run(conv_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=30)
+        else:
+            # Video is VP9, AV1, or non-standard pixel format!
+            # Must transcode to H.264 (yuv420p) for Android Gallery hardware decoder.
+            # Using -preset ultrafast -crf 23 ensures very fast encoding without blocking.
+            conv_cmd = [
+                str(ffmpeg_exe), "-y", "-i", str(file_path),
+                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23", "-pix_fmt", "yuv420p",
+                "-c:a", "aac" if (has_audio and not is_aac) else "copy",
+                "-movflags", "+faststart",
+                temp_out
+            ]
+            proc = subprocess.run(conv_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=120)
 
-        proc = subprocess.run(conv_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=25)
         if proc.returncode == 0 and os.path.exists(temp_out) and os.path.getsize(temp_out) > 0:
             os.replace(temp_out, file_path)
         elif os.path.exists(temp_out):
@@ -453,24 +469,27 @@ def format_duration(seconds: Optional[float]) -> str:
     return f"{m:02d}:{s:02d}"
 
 def estimate_video_size(height: Optional[int], duration: Optional[float], bitrate: Optional[float] = None) -> str:
+    target_height = height or 720
+    res_bitrates = {2160: 8000, 1440: 4500, 1080: 1600, 720: 950, 480: 550, 360: 320, 240: 200, 144: 120}
+    closest = min(res_bitrates.keys(), key=lambda k: abs(k - target_height))
+
     if not duration or duration <= 0:
-        return "~ 15 MB"
+        default_sizes = {2160: "~ 95 MB", 1440: "~ 55 MB", 1080: "~ 32 MB", 720: "~ 18 MB", 480: "~ 9.5 MB", 360: "~ 5.8 MB", 240: "~ 3.8 MB", 144: "~ 2.2 MB"}
+        return default_sizes.get(closest, "~ 18 MB")
+
     if bitrate and bitrate > 0:
         bytes_est = (bitrate * 1024 / 8) * duration
         return f"{format_bytes(bytes_est)}"
     
     # Modern efficient video bitrates (H.264/VP9/AV1 + AAC/Opus audio)
-    res_bitrates = {2160: 8000, 1440: 4500, 1080: 1600, 720: 950, 480: 550, 360: 320, 240: 200, 144: 120}
-    target_height = height or 720
-    closest = min(res_bitrates.keys(), key=lambda k: abs(k - target_height))
     kbps = res_bitrates[closest] + 128
     bytes_est = (kbps * 1024 / 8) * duration
     return f"{format_bytes(bytes_est)}"
 
 def estimate_audio_size(duration: Optional[float], abr: Optional[float] = 320) -> str:
-    if not duration or duration <= 0:
-        return "~ 4.5 MB"
     bitrate = abr or 320
+    if not duration or duration <= 0:
+        return "~ 7.5 MB" if bitrate >= 300 else ("~ 4.8 MB" if bitrate >= 190 else "~ 3.2 MB")
     bytes_est = (bitrate * 1024 / 8) * duration
     return f"{format_bytes(bytes_est)}"
 
@@ -583,7 +602,16 @@ async def get_media_info(payload: InfoRequest):
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl_inst:
             for h in available_heights:
-                fmt_spec = f"bestvideo[height<={h}][vcodec^=avc1]+bestaudio[acodec^=mp4a]/bestvideo[height<={h}][vcodec^=avc1]+bestaudio/bestvideo[height<={h}]+bestaudio[acodec^=mp4a]/bestvideo[height<={h}]+bestaudio/best[height<={h}]/best"
+                fmt_spec = (
+                    f"bestvideo[height={h}][vcodec^=avc1]+bestaudio[acodec^=mp4a]/"
+                    f"bestvideo[height={h}][vcodec^=avc1]+bestaudio/"
+                    f"bestvideo[height={h}]+bestaudio[acodec^=mp4a]/"
+                    f"bestvideo[height={h}]+bestaudio/"
+                    f"best[height={h}]/"
+                    f"bestvideo[height<={h}][vcodec^=avc1]+bestaudio/"
+                    f"bestvideo[height<={h}]+bestaudio/"
+                    f"best"
+                )
                 try:
                     selector = ydl_inst.build_format_selector(fmt_spec)
                     selected_fmts = list(selector({'formats': formats, 'incomplete_formats': False}))
@@ -639,30 +667,31 @@ async def get_media_info(payload: InfoRequest):
                         'is_audio': False
                     })
 
-        # Fallback for progressive / single-stream platforms (Twitter, TikTok, etc.)
+        # Fallback for progressive / single-stream platforms (Twitter, TikTok, Instagram, etc.)
         if not video_options:
             seen_res = set()
-            h264_formats = sorted(
-                [f for f in formats if f.get('vcodec') and f.get('vcodec') != 'none'],
+            candidate_formats = sorted(
+                [f for f in formats if (f.get('vcodec') and f.get('vcodec') != 'none') or f.get('ext') in ['mp4', 'webm'] or f.get('url')],
                 key=lambda x: (
                     1 if any(c in str(x.get('vcodec', '')).lower() for c in ['avc1', 'h264']) else 0,
                     x.get('height') or 0
                 ),
                 reverse=True
             )
-            for f in h264_formats:
+            for f in candidate_formats:
                 h = f.get('height') or 720
                 key = f"{h}p"
                 if key not in seen_res:
                     seen_res.add(key)
-                    sz = f.get('filesize') or f.get('filesize_approx') or int(((f.get('tbr') or f.get('vbr') or 1200) * 1024 / 8) * duration)
-                    f_id = f.get('format_id')
+                    sz = f.get('filesize') or f.get('filesize_approx') or (int(((f.get('tbr') or f.get('vbr') or 1200) * 1024 / 8) * duration) if duration else 0)
+                    sz_str = format_bytes(sz) if sz > 0 else estimate_video_size(h, duration)
+                    f_id = f.get('format_id') or 'best'
                     video_options.append({
                         'format_id': f_id,
                         'height': h,
                         'quality': f"{h}p HD" if h >= 720 else f"{h}p SD",
                         'ext': 'mp4',
-                        'size': format_bytes(sz),
+                        'size': sz_str,
                         'is_audio': False
                     })
             video_options.sort(key=lambda x: x['height'], reverse=True)
