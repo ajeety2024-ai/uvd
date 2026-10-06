@@ -479,12 +479,12 @@ def format_duration(seconds: Optional[float]) -> str:
 
 def estimate_video_size(height: Optional[int], duration: Optional[float], bitrate: Optional[float] = None) -> str:
     target_height = height or 720
-    res_bitrates = {2160: 8000, 1440: 4500, 1080: 1600, 720: 950, 480: 550, 360: 320, 240: 200, 144: 120}
+    res_bitrates = {2160: 8000, 1440: 4500, 1080: 2200, 720: 1000, 480: 550, 360: 320, 240: 200, 144: 120}
     closest = min(res_bitrates.keys(), key=lambda k: abs(k - target_height))
 
     if not duration or duration <= 0:
-        default_sizes = {2160: "~ 95 MB", 1440: "~ 55 MB", 1080: "~ 32 MB", 720: "~ 18 MB", 480: "~ 9.5 MB", 360: "~ 5.8 MB", 240: "~ 3.8 MB", 144: "~ 2.2 MB"}
-        return default_sizes.get(closest, "~ 18 MB")
+        default_sizes = {2160: "~ 95 MB", 1440: "~ 55 MB", 1080: "~ 38 MB", 720: "~ 20 MB", 480: "~ 11 MB", 360: "~ 6.5 MB", 240: "~ 4.2 MB", 144: "~ 2.5 MB"}
+        return default_sizes.get(closest, "~ 20 MB")
 
     if bitrate and bitrate > 0:
         bytes_est = (bitrate * 1024 / 8) * duration
@@ -631,17 +631,39 @@ async def get_media_info(payload: InfoRequest):
                 if not selected_fmts:
                     continue
 
+                v_stream = selected_fmts[0] if selected_fmts else {}
+                actual_h = v_stream.get('height') or h
+                fps = v_stream.get('fps')
+
+                res_bitrates = {2160: 8000, 1440: 4500, 1080: 2200, 720: 1000, 480: 550, 360: 320, 240: 200, 144: 120}
                 total_bytes = 0
                 for sf in selected_fmts:
                     s_bytes = sf.get('filesize') or sf.get('filesize_approx')
                     if not s_bytes and (sf.get('tbr') or sf.get('vbr') or sf.get('abr')) and duration and duration > 0:
                         s_bytes = int(((sf.get('tbr') or sf.get('vbr') or sf.get('abr')) * 1024 / 8) * duration)
+                    
+                    # If this stream is a video stream and size is still unknown/0, estimate using resolution bitrate
+                    if not s_bytes and sf.get('vcodec') and sf.get('vcodec') != 'none':
+                        closest_h = min(res_bitrates.keys(), key=lambda k: abs(k - actual_h))
+                        kbps = res_bitrates[closest_h]
+                        if duration and duration > 0:
+                            s_bytes = int((kbps * 1024 / 8) * duration)
+                        else:
+                            s_bytes = int(kbps * 1024 * 1024 / 8 * 90)
+
+                    # If this stream is an audio-only stream and size is still unknown/0, estimate using standard 128kbps
+                    if not s_bytes and sf.get('acodec') and sf.get('acodec') != 'none' and (not sf.get('vcodec') or sf.get('vcodec') == 'none'):
+                        if duration and duration > 0:
+                            s_bytes = int((128 * 1024 / 8) * duration)
+                        else:
+                            s_bytes = int(4 * 1024 * 1024)
+
                     if s_bytes:
                         total_bytes += s_bytes
 
-                v_stream = selected_fmts[0] if selected_fmts else {}
-                actual_h = v_stream.get('height') or h
-                fps = v_stream.get('fps')
+                if total_bytes <= 0 and duration and duration > 0:
+                    closest_h = min(res_bitrates.keys(), key=lambda k: abs(k - actual_h))
+                    total_bytes = int(((res_bitrates[closest_h] + 128) * 1024 / 8) * duration)
 
                 if actual_h >= 2160:
                     quality_label = f"4K Ultra HD ({actual_h}p)"
@@ -674,6 +696,7 @@ async def get_media_info(payload: InfoRequest):
                         'quality': quality_label,
                         'ext': 'mp4',
                         'size': size_str,
+                        'raw_bytes': total_bytes,
                         'is_audio': False
                     })
 
@@ -694,6 +717,9 @@ async def get_media_info(payload: InfoRequest):
                 if key not in seen_res:
                     seen_res.add(key)
                     sz = f.get('filesize') or f.get('filesize_approx') or (int(((f.get('tbr') or f.get('vbr') or 1200) * 1024 / 8) * duration) if duration else 0)
+                    if not sz and duration and duration > 0:
+                        closest_h = min(res_bitrates.keys(), key=lambda k: abs(k - h))
+                        sz = int((res_bitrates[closest_h] * 1024 / 8) * duration)
                     sz_str = format_bytes(sz) if sz > 0 else estimate_video_size(h, duration)
                     f_id = f.get('format_id') or 'best'
                     video_options.append({
@@ -702,6 +728,7 @@ async def get_media_info(payload: InfoRequest):
                         'quality': f"{h}p HD" if h >= 720 else f"{h}p SD",
                         'ext': 'mp4',
                         'size': sz_str,
+                        'raw_bytes': sz,
                         'is_audio': False
                     })
             video_options.sort(key=lambda x: x['height'], reverse=True)
@@ -713,6 +740,7 @@ async def get_media_info(payload: InfoRequest):
                 'quality': '1080p Full HD (Best)',
                 'ext': 'mp4',
                 'size': estimate_video_size(1080, duration),
+                'raw_bytes': int(((2200 + 128) * 1024 / 8) * duration) if duration else 0,
                 'is_audio': False
             })
             video_options.append({
@@ -721,8 +749,27 @@ async def get_media_info(payload: InfoRequest):
                 'quality': '720p HD',
                 'ext': 'mp4',
                 'size': estimate_video_size(720, duration),
+                'raw_bytes': int(((1000 + 128) * 1024 / 8) * duration) if duration else 0,
                 'is_audio': False
             })
+
+        # Monotonic size hierarchy guarantee: Higher resolution MUST NOT have smaller size than lower resolution
+        if video_options:
+            video_options.sort(key=lambda x: x['height'])  # Lowest to highest (e.g. 144p -> 1080p)
+            running_min_bytes = 0
+            for opt in video_options:
+                b = opt.get('raw_bytes', 0)
+                if b < running_min_bytes:
+                    # Higher resolution had a smaller size reported than a lower resolution!
+                    # Enforce realistic scaling (at least 20% larger than the lower resolution)
+                    scaled = int(running_min_bytes * 1.25)
+                    opt['raw_bytes'] = scaled
+                    opt['size'] = format_bytes(scaled)
+                    running_min_bytes = scaled
+                else:
+                    running_min_bytes = max(running_min_bytes, b)
+            # Re-sort descending (highest resolution first: 1080p -> 720p -> 480p...)
+            video_options.sort(key=lambda x: x['height'], reverse=True)
 
         # Audio options
         audio_options.append({
