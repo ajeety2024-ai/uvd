@@ -691,7 +691,7 @@
               </div>
           </div>
 
-          <!-- Spotlight Action Buttons (Pause, Skip, Stop) -->
+          <!-- Spotlight Action Buttons (Pause, Cancel, and optional Skip for Playlists) -->
           <div class="flex flex-wrap items-center gap-2 pt-3 border-t border-indigo-500/20">
             <button id="activePauseResumeBtn" class="py-2 px-4 rounded-xl bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold flex items-center space-x-1.5 shadow-md">
               <i data-lucide="pause" class="w-3.5 h-3.5"></i>
@@ -701,17 +701,9 @@
               <i data-lucide="x" class="w-3.5 h-3.5"></i>
               <span>Cancel Current</span>
             </button>
-            <button id="activeSkipNextBtn" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center space-x-1.5 border border-slate-700">
+            <button id="activeSkipNextBtn" class="hidden py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center space-x-1.5 border border-slate-700">
               <i data-lucide="skip-forward" class="w-3.5 h-3.5 text-indigo-400"></i>
               <span>Skip to Next</span>
-            </button>
-            <button id="activeOpenFolderBtn" class="py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center space-x-1.5 border border-slate-700">
-              <i data-lucide="folder" class="w-3.5 h-3.5 text-indigo-400"></i>
-              <span>Open Folder</span>
-            </button>
-            <button id="activeStopAllBtn" class="py-2 px-3 rounded-xl bg-red-950/60 hover:bg-red-900/60 text-red-300 text-xs font-bold flex items-center space-x-1.5 border border-red-500/30 ml-auto">
-              <i data-lucide="square" class="w-3.5 h-3.5"></i>
-              <span>Stop Queue</span>
             </button>
           </div>
 
@@ -1212,7 +1204,7 @@
   </nav>
 
   <!-- Scripts -->
-  <script src="/js/app2.js?v=2.1.8"></script>
+  <script src="/js/app2.js?v=2.1.9"></script>
   <script>
     if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
       lucide.createIcons();
