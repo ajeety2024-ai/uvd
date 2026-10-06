@@ -646,16 +646,20 @@ async function bootApp() {
   try { initTheme(); } catch (e) { console.error('initTheme error:', e); }
   try { initMobileBottomNav(); } catch (e) { console.error('initMobileBottomNav error:', e); }
   try { initHistoryControls(); } catch (e) { console.error('initHistoryControls error:', e); }
-  try { loadDownloadsHistory(); } catch (e) { console.error('loadDownloadsHistory error:', e); }
-  try { loadSavedPlaylists(); } catch (e) { console.error('loadSavedPlaylists error:', e); }
-  try { await loadActiveQueueTasks(); } catch (e) { console.error('loadActiveQueueTasks error:', e); }
-  try { registerPWA(); } catch (e) { console.error('registerPWA error:', e); }
-  try {
-    await fetchAuthStatus();
-    if (!authState.can_download) {
+
+  // Parallel asynchronous data loading so initial UI opens with 0ms delay
+  Promise.allSettled([
+    loadDownloadsHistory(),
+    loadSavedPlaylists(),
+    loadActiveQueueTasks(),
+    fetchAuthStatus()
+  ]).then(() => {
+    if (authState && !authState.can_download) {
       window.openAuthModal('register');
     }
-  } catch (e) { console.error('fetchAuthStatus error:', e); }
+  }).catch(() => {});
+
+  try { registerPWA(); } catch (e) { console.error('registerPWA error:', e); }
 }
 
 if (document.readyState === 'loading') {
