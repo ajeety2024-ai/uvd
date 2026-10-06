@@ -2448,6 +2448,22 @@ function renderFilteredHistoryList() {
   const countBadge = document.getElementById('historyCountBadge');
   const noResultsEl = document.getElementById('historyNoResults');
   const clearBtn = document.getElementById('historyClearSearchBtn');
+  const searchContainer = document.getElementById('historySearchContainer');
+  const searchInput = document.getElementById('historySearchInput');
+
+  // Search box only visible when downloaded items > 3 (on both mobile and laptop)
+  const totalDownloaded = Array.isArray(window._allDownloadedItems) ? window._allDownloadedItems.length : 0;
+  if (searchContainer) {
+    if (totalDownloaded > 3) {
+      searchContainer.classList.remove('hidden');
+    } else {
+      searchContainer.classList.add('hidden');
+      if (searchInput && window._currentHistorySearch) {
+        searchInput.value = '';
+        window._currentHistorySearch = '';
+      }
+    }
+  }
 
   let filtered = [...window._allDownloadedItems];
 
@@ -2480,6 +2496,8 @@ function renderFilteredHistoryList() {
   } else {
     if (noResultsEl) noResultsEl.classList.add('hidden');
 
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
+
     filtered.forEach(item => {
       const row = document.createElement('div');
       row.className = 'history-item-row flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-2xl bg-slate-800/40 border border-slate-700/50 hover:bg-slate-800/70 transition-all gap-3 cursor-pointer select-none';
@@ -2501,6 +2519,16 @@ function renderFilteredHistoryList() {
         `;
       }
 
+      // Channel name: Clickable on Laptop UVD only, plain text on Mobile UVD
+      let uploaderHtml = '';
+      if (item.uploader) {
+        if (!isMobile) {
+          uploaderHtml = `<span>•</span> <span class="btn-channel-link inline-flex items-center space-x-1 text-indigo-400 hover:text-indigo-300 hover:underline cursor-pointer group" title="Open ${item.uploader} channel on YouTube"><span>${item.uploader}</span><svg class="w-2.5 h-2.5 opacity-70 group-hover:opacity-100 transition-opacity ml-0.5 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></span>`;
+        } else {
+          uploaderHtml = `<span>•</span> <span class="text-indigo-400">${item.uploader}</span>`;
+        }
+      }
+
       row.innerHTML = `
         <div class="flex items-center space-x-3 overflow-hidden mr-2">
           ${thumbHtml}
@@ -2512,7 +2540,7 @@ function renderFilteredHistoryList() {
               <span>${item.size}</span>
               <span>•</span>
               <span>${item.created}</span>
-              ${item.uploader ? `<span>•</span> <span class="text-indigo-400">${item.uploader}</span>` : ''}
+              ${uploaderHtml}
             </div>
           </div>
         </div>
@@ -2524,7 +2552,7 @@ function renderFilteredHistoryList() {
             <span>Play</span>
           </button>
           
-          ${/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ? `
+          ${isMobile ? `
           <a href="/api/file?filename=${encodeURIComponent(item.name)}&download=1" download="${item.name}" class="btn-save-phone px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border border-emerald-500/30 rounded-xl text-xs font-semibold flex items-center space-x-1 transition-all" title="Save directly to phone gallery" onclick="event.stopPropagation()">
             <svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>Save</span>
@@ -2544,6 +2572,14 @@ function renderFilteredHistoryList() {
       `;
 
       row.addEventListener('click', (e) => {
+        const channelBtn = e.target.closest('.btn-channel-link');
+        if (channelBtn) {
+          e.preventDefault();
+          e.stopPropagation();
+          window.openChannelOnYouTube(item.uploader, item.channel_url, item.url);
+          return;
+        }
+
         const delBtn = e.target.closest('.btn-delete');
         if (delBtn) {
           e.preventDefault();
@@ -2570,6 +2606,33 @@ function renderFilteredHistoryList() {
 
   safeCreateIcons();
 }
+
+window.openChannelOnYouTube = function(uploader, channelUrl, videoUrl) {
+  if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768) {
+    return;
+  }
+
+  let targetUrl = channelUrl;
+  if (!targetUrl || !targetUrl.startsWith('http')) {
+    if (uploader) {
+      targetUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(uploader.trim())}`;
+    } else if (videoUrl) {
+      targetUrl = videoUrl;
+    }
+  }
+
+  if (!targetUrl) return;
+
+  try {
+    window.open(targetUrl, '_blank');
+  } catch (e) {}
+
+  fetch('/api/open-channel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uploader: uploader, channel_url: targetUrl, url: videoUrl })
+  }).catch(() => {});
+};
 
 function initHistoryControls() {
   const searchInput = document.getElementById('historySearchInput');
