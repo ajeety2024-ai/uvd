@@ -568,6 +568,8 @@ async function loadActiveQueueTasks() {
       renderPanelActiveTasks();
       renderModalQueueList();
       updateModalHeader();
+    } else {
+      updateDashboardEmptyState();
     }
   } catch (e) {
     console.error("Failed to load active tasks:", e);
@@ -2256,8 +2258,19 @@ function renderPanelActiveTasks() {
   const panelActiveBadge = document.getElementById('panelActiveBadge');
   const panelActiveItemsList = document.getElementById('panelActiveItemsList');
   const navDownloadsCountBadge = document.getElementById('navDownloadsCountBadge');
+  const panelOpenManagerBtn = document.getElementById('panelOpenManagerBtn');
 
   const activeItems = activeQueue.filter(i => i.status === 'downloading' || i.status === 'pending' || i.status === 'paused' || i.status === 'error');
+  const hasActiveManagerTasks = activeQueue.some(i => i.status === 'downloading' || i.status === 'pending' || i.status === 'queued' || i.status === 'paused' || i.status === 'processing') || (currentActiveItem && (currentActiveItem.status === 'downloading' || currentActiveItem.status === 'pending' || currentActiveItem.status === 'paused')) || isQueueRunning;
+
+  // Toggle "Download Manager" button visibility: show ONLY if downloading, paused, or queued
+  if (panelOpenManagerBtn) {
+    if (hasActiveManagerTasks) {
+      panelOpenManagerBtn.classList.remove('hidden');
+    } else {
+      panelOpenManagerBtn.classList.add('hidden');
+    }
+  }
 
   if (navDownloadsCountBadge) {
     if (activeItems.length > 0) {
@@ -2407,10 +2420,20 @@ function updateDashboardEmptyState() {
   const panelRecentSection = document.getElementById('panelRecentSection');
   const panelEmptyState = document.getElementById('panelEmptyState');
   const downloadsPanel = document.getElementById('downloadsPanel');
+  const panelOpenManagerBtn = document.getElementById('panelOpenManagerBtn');
 
-  const hasActive = activeQueue.some(i => i.status === 'downloading' || i.status === 'pending' || i.status === 'paused');
+  const hasActive = activeQueue.some(i => i.status === 'downloading' || i.status === 'pending' || i.status === 'queued' || i.status === 'paused' || i.status === 'processing') || (currentActiveItem && (currentActiveItem.status === 'downloading' || currentActiveItem.status === 'pending' || currentActiveItem.status === 'paused')) || isQueueRunning;
   const hasRecent = Array.isArray(window._allDownloadedItems) && window._allDownloadedItems.length > 0;
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+  // Toggle "Download Manager" button visibility: show ONLY if downloading, paused, or queued
+  if (panelOpenManagerBtn) {
+    if (hasActive) {
+      panelOpenManagerBtn.classList.remove('hidden');
+    } else {
+      panelOpenManagerBtn.classList.add('hidden');
+    }
+  }
 
   if (downloadsPanel) {
     if (isMobile) {
