@@ -32,6 +32,13 @@ from pydantic import BaseModel
 import imageio_ffmpeg
 import threading
 
+# Prevent WebView2 / Chromium screen flickering and blinking on Windows laptops (AMD Radeon / Intel Iris)
+if sys.platform == "win32":
+    existing_args = os.environ.get("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", "")
+    flags = "--disable-gpu-compositing --disable-direct-composition --disable-features=CalculateNativeWinOcclusion"
+    if flags not in existing_args:
+        os.environ["WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS"] = f"{existing_args} {flags}".strip()
+
 # Asynchronous non-blocking background pre-warming of yt_dlp for instant startup
 def _warmup_ytdlp():
     try:
