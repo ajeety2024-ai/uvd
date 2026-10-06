@@ -502,7 +502,7 @@
     </div>
 
     <!-- Active & Recent Downloads Panel (Desktop Utility Dashboard) -->
-    <div id="downloadsPanel" class="max-w-4xl mx-auto mt-6 mb-12">
+    <div id="downloadsPanel" class="max-w-4xl mx-auto mt-6 mb-12 hidden md:block">
       <div class="glass-panel p-4 sm:p-6 rounded-3xl shadow-2xl border border-slate-800/80">
         
         <!-- Panel Header -->
@@ -885,22 +885,6 @@
             </details>
           </div>
 
-          <!-- Android Mobile App Connect -->
-          <div class="p-3 rounded-2xl bg-gradient-to-r from-indigo-950/40 to-purple-950/40 border border-indigo-500/30 flex items-center justify-between">
-            <div class="flex items-center space-x-2.5">
-              <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold">
-                <i data-lucide="smartphone" class="w-4 h-4"></i>
-              </div>
-              <div>
-                <div class="text-xs font-bold text-slate-200">Android Mobile Connect</div>
-                <div id="settingsMobileUrl" class="text-[10px] text-indigo-300 font-mono">Loading IP...</div>
-              </div>
-            </div>
-            <button id="copyMobileUrlBtn" type="button" class="px-2.5 py-1 bg-indigo-600/30 hover:bg-indigo-600 text-indigo-300 hover:text-white rounded-lg text-[10px] font-bold border border-indigo-500/40 transition-all cursor-pointer">
-              Copy Link
-            </button>
-          </div>
-
           <!-- Legal & Copyright Notice -->
           <div class="pt-3 border-t border-slate-800 text-[10px] text-slate-400 flex items-center justify-between">
             <div>
@@ -1228,7 +1212,7 @@
   </nav>
 
   <!-- Scripts -->
-  <script src="/js/app2.js?v=2.1.7"></script>
+  <script src="/js/app2.js?v=2.1.8"></script>
   <script>
     if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
       lucide.createIcons();
