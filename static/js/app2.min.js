@@ -65,7 +65,7 @@ if (!_isLocalStorageWorking && typeof window !== 'undefined') {
   } catch (e) {}
 }
 
-// OmniDownloader Safe Icon Renderer
+// UVD Safe Icon Renderer
 function safeCreateIcons() {
   try {
     if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
@@ -76,7 +76,7 @@ function safeCreateIcons() {
   }
 }
 
-// OmniDownloader Core Frontend Controller with Full Thumbnails, Themes, and Priority Queue
+// UVD Core Frontend Controller with Full Thumbnails, Themes, and Priority Queue
 
 let currentMediaData = null;
 let currentPlaylistData = null;
@@ -674,7 +674,7 @@ if (document.readyState === 'loading') {
    THEME SWITCHER (Light & Dark Mode)
    ========================================================================== */
 function initTheme() {
-  const savedTheme = safeStorage.getItem('omni_theme') || 'dark';
+  const savedTheme = safeStorage.getItem('uvd_theme') || safeStorage.getItem('omni_theme') || 'dark';
   applyTheme(savedTheme);
 
   if (themeToggleBtn) {
@@ -682,7 +682,7 @@ function initTheme() {
       const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
       const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
       applyTheme(newTheme);
-      safeStorage.setItem('omni_theme', newTheme);
+      safeStorage.setItem('uvd_theme', newTheme);
     });
   }
 }
@@ -2875,7 +2875,12 @@ async function initSettings() {
     const res = await fetch('/api/settings');
     if (res.ok) {
       appSettings = await res.json();
-      if (settingDownloadDir) settingDownloadDir.value = appSettings.download_dir || '';
+      let dlDir = appSettings.download_dir || '';
+      if (dlDir.toLowerCase().includes('omnidownloader')) {
+        dlDir = dlDir.replace(/OmniDownloader/gi, 'UVD Downloader');
+        appSettings.download_dir = dlDir;
+      }
+      if (settingDownloadDir) settingDownloadDir.value = dlDir;
       if (settingAutoClipboard) settingAutoClipboard.checked = !!appSettings.auto_clipboard;
       if (settingAutoSubtitles) settingAutoSubtitles.checked = !!appSettings.download_subtitles;
       if (settingAutoShutdown) settingAutoShutdown.checked = !!appSettings.auto_shutdown;
