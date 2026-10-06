@@ -16,8 +16,12 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Preconnect for fast fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <!-- Tailwind CSS (Instant local bundle) -->
+  <script src="/js/tailwind.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -1204,7 +1208,7 @@
   </nav>
 
   <!-- Scripts -->
-  <script src="/js/app2.js?v=2.1.9"></script>
+  <script src="/js/app2.js?v=2.2.0"></script>
   <script>
     if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
       lucide.createIcons();
