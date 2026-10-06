@@ -19,6 +19,8 @@ import asyncio
 import hashlib
 import sqlite3
 import subprocess
+import urllib.parse
+import webbrowser
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
@@ -1116,6 +1118,7 @@ def run_yt_dlp_download(
             "filename": final_name,
             "title": title or res.get('title') or final_name,
             "url": url,
+            "channel_url": res.get('channel_url') or res.get('uploader_url') or "",
             "thumbnail": final_thumb,
             "duration": duration or format_duration(res.get('duration')),
             "uploader": uploader or res.get('uploader') or "Creator",
@@ -1436,6 +1439,8 @@ async def list_local_downloads():
         files.append({
             "name": f.name,
             "title": file_meta.get("title", f.name),
+            "url": file_meta.get("url", ""),
+            "channel_url": file_meta.get("channel_url") or file_meta.get("uploader_url") or "",
             "thumbnail": file_meta.get("thumbnail", ""),
             "duration": file_meta.get("duration", ""),
             "uploader": file_meta.get("uploader", ""),
@@ -1446,6 +1451,31 @@ async def list_local_downloads():
         })
     files.sort(key=lambda x: x["created"], reverse=True)
     return {"downloads": files, "folder": str(target_dir)}
+
+@app.post("/api/open-channel")
+async def open_channel_endpoint(payload: Dict[str, Any]):
+    channel_url = payload.get("channel_url")
+    uploader = payload.get("uploader", "")
+    url = payload.get("url", "")
+
+    target_url = ""
+    if channel_url and str(channel_url).startswith("http"):
+        target_url = str(channel_url).strip()
+    elif uploader:
+        target_url = f"https://www.youtube.com/results?search_query={urllib.parse.quote_plus(str(uploader).strip())}"
+    elif url and str(url).startswith("http"):
+        target_url = str(url).strip()
+
+    if target_url:
+        try:
+            if sys.platform == "win32":
+                os.startfile(target_url)
+            else:
+                webbrowser.open(target_url)
+            return {"success": True, "url": target_url}
+        except Exception as e:
+            return {"success": False, "error": str(e), "url": target_url}
+    return {"success": False, "message": "No valid channel URL"}
 
 @app.post("/api/open-folder")
 async def open_download_folder():
