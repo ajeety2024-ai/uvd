@@ -605,6 +605,7 @@ function initMobileBottomNav() {
   if (homeBtn) {
     homeBtn.addEventListener('click', () => {
       setActiveTab(homeBtn);
+      updateDashboardEmptyState();
       window.scrollTo({ top: 0, behavior: 'smooth' });
       const input = document.getElementById('urlInput');
       if (input) input.focus();
@@ -623,6 +624,8 @@ function initMobileBottomNav() {
       setActiveTab(libraryBtn);
       const panel = document.getElementById('downloadsPanel');
       if (panel) {
+        panel.classList.remove('hidden');
+        panel.style.removeProperty('display');
         panel.scrollIntoView({ behavior: 'smooth' });
       } else {
         openDownloadManagerModal();
@@ -1005,6 +1008,9 @@ function setupEventListeners() {
       supportedPlatformsContainer.style.setProperty('display', 'none', 'important');
     }
   }
+
+  // Ensure mobile downloadsPanel visibility is synchronized on setup
+  updateDashboardEmptyState();
 
   document.querySelectorAll('.platform-quick-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2299,9 +2305,26 @@ function updateDashboardEmptyState() {
   const panelActiveSection = document.getElementById('panelActiveSection');
   const panelRecentSection = document.getElementById('panelRecentSection');
   const panelEmptyState = document.getElementById('panelEmptyState');
+  const downloadsPanel = document.getElementById('downloadsPanel');
 
   const hasActive = activeQueue.some(i => i.status === 'downloading' || i.status === 'pending' || i.status === 'paused');
   const hasRecent = Array.isArray(window._allDownloadedItems) && window._allDownloadedItems.length > 0;
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+  if (downloadsPanel) {
+    if (isMobile) {
+      if (!hasActive && !hasRecent) {
+        downloadsPanel.classList.add('hidden');
+        downloadsPanel.style.setProperty('display', 'none', 'important');
+      } else {
+        downloadsPanel.classList.remove('hidden');
+        downloadsPanel.style.removeProperty('display');
+      }
+    } else {
+      downloadsPanel.classList.remove('hidden');
+      downloadsPanel.style.removeProperty('display');
+    }
+  }
 
   if (panelRecentSection) {
     if (hasRecent) panelRecentSection.classList.remove('hidden');
