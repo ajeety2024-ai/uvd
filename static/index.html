@@ -577,8 +577,8 @@
                 <button type="button" id="historyFilterAudio" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white cursor-pointer transition-all">Audio</button>
               </div>
 
-              <!-- Search Bar -->
-              <div class="relative w-40 sm:w-52">
+              <!-- Search Bar (Visible only when downloaded items > 3) -->
+              <div id="historySearchContainer" class="hidden relative w-40 sm:w-52">
                 <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none"></i>
                 <input 
                   type="text" 
@@ -1221,7 +1221,7 @@
   </nav>
 
   <!-- Scripts -->
-  <script src="/js/app2.js?v=2.2.1"></script>
+  <script src="/js/app2.js?v=2.2.2"></script>
   <script>
     if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
       lucide.createIcons();
