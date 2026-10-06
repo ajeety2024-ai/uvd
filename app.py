@@ -62,7 +62,7 @@ APP_DATA_DIR = Path.home() / ".omnidownloader"
 APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
 SETTINGS_FILE = APP_DATA_DIR / "app_settings.json"
 DEFAULT_SETTINGS = {
-    "download_dir": str(Path.home() / "Downloads" / "OmniDownloader"),
+    "download_dir": str(Path.home() / "Downloads" / "UVD Downloader"),
     "auto_clipboard": True,
     "auto_shutdown": False,
     "download_subtitles": False,
@@ -78,6 +78,13 @@ def load_settings() -> dict:
             data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
             merged = DEFAULT_SETTINGS.copy()
             merged.update(data)
+            # Automatic migration: if old download_dir contains OmniDownloader, migrate to UVD Downloader
+            if "download_dir" in merged and "omnidownloader" in str(merged["download_dir"]).lower():
+                merged["download_dir"] = re.sub(r'OmniDownloader', 'UVD Downloader', str(merged["download_dir"]), flags=re.IGNORECASE)
+                try:
+                    save_settings(merged)
+                except Exception:
+                    pass
             return merged
         except Exception:
             pass
@@ -91,14 +98,31 @@ def save_settings(data: dict):
 
 def get_download_dir() -> Path:
     settings = load_settings()
-    target_path = settings.get("download_dir") or str(Path.home() / "Downloads" / "OmniDownloader")
+    target_path = settings.get("download_dir") or str(Path.home() / "Downloads" / "UVD Downloader")
     target = Path(target_path)
     try:
         target.mkdir(parents=True, exist_ok=True)
     except Exception:
-        target = Path.home() / "Downloads" / "OmniDownloader"
+        target = Path.home() / "Downloads" / "UVD Downloader"
         target.mkdir(parents=True, exist_ok=True)
     return target
+
+# Auto-migrate existing downloaded files from Downloads/OmniDownloader to Downloads/UVD Downloader
+try:
+    _old_dl = Path.home() / "Downloads" / "OmniDownloader"
+    _new_dl = Path.home() / "Downloads" / "UVD Downloader"
+    _new_dl.mkdir(parents=True, exist_ok=True)
+    if _old_dl.exists() and _old_dl.is_dir():
+        for _f in _old_dl.glob("*"):
+            if _f.is_file():
+                _dest = _new_dl / _f.name
+                if not _dest.exists():
+                    try:
+                        _f.rename(_dest)
+                    except Exception:
+                        pass
+except Exception:
+    pass
 
 def parse_time_str(t_str: Optional[str]) -> Optional[float]:
     if not t_str:
@@ -321,9 +345,9 @@ def get_base_ydl_opts() -> dict:
 
 
 app = FastAPI(
-    title="OmniDownloader API",
+    title="UVD - Universal Video Downloader API",
     description="Universal Social Media Video & Audio Downloader with Thumbnail Tracking",
-    version="1.4.0"
+    version=APP_VERSION
 )
 
 
@@ -817,7 +841,7 @@ async def get_media_info(payload: InfoRequest):
             pass
 
         if not existing_file:
-            safe_title = re.sub(r'[\\/*?:"<>|]', "", title or "OmniVideo")[:50].strip() or "video"
+            safe_title = re.sub(r'[\\/*?:"<>|]', "", title or "UVD_Video")[:50].strip() or "video"
             for fpath in target_dir.glob(f"{safe_title}*.*"):
                 if fpath.is_file() and not fpath.name.endswith(".part") and not fpath.name.endswith(".ytdl") and not fpath.name.endswith(".tmp"):
                     if fpath.stat().st_size > 0:
@@ -877,7 +901,7 @@ def run_yt_dlp_download(
     download_subtitles: Optional[bool] = False
 ):
     import yt_dlp
-    safe_title = re.sub(r'[\\/*?:"<>|]', "", title or "OmniVideo")[:50].strip() or "video"
+    safe_title = re.sub(r'[\\/*?:"<>|]', "", title or "UVD_Video")[:50].strip() or "video"
     url_hash = hashlib.md5(f"{url}_{format_id}_{is_audio}".encode('utf-8')).hexdigest()[:8]
     file_stem = f"{safe_title}_{url_hash}"
     target_dir = get_download_dir()
@@ -887,7 +911,7 @@ def run_yt_dlp_download(
         "url": url,
         "format_id": format_id,
         "is_audio": is_audio,
-        "title": title or "OmniDownload",
+        "title": title or "UVD_Download",
         "quality_label": quality_label or ("MP3 Audio" if is_audio else "HD Video"),
         "thumbnail": thumbnail or "",
         "duration": duration or "",
@@ -1193,7 +1217,7 @@ async def start_download_task(payload: StartDownloadRequest, background_tasks: B
         url=payload.url,
         format_id=payload.format_id,
         is_audio=payload.is_audio,
-        title=payload.title or "OmniDownload",
+        title=payload.title or "UVD_Download",
         quality_label=payload.quality_label,
         thumbnail=payload.thumbnail,
         duration=payload.duration,
