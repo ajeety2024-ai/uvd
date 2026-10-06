@@ -171,7 +171,7 @@
             <input 
               type="text" 
               id="urlInput"
-              placeholder="Paste single video link or Playlist link here..."
+              placeholder="Paste any video, movie or playlist link here..."
               class="w-full pl-10 sm:pl-12 pr-24 sm:pr-28 py-3.5 sm:py-4 bg-slate-900/90 border border-slate-700/60 rounded-xl sm:rounded-2xl text-sm sm:text-base text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/30 transition-all font-medium"
               autocomplete="off"
             />
@@ -238,6 +238,10 @@
         <button class="platform-chip platform-quick-btn px-2.5 py-1 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 backdrop-blur-md border border-slate-800/60 hover:border-red-600/40 text-slate-400 hover:text-slate-200 text-[11px] font-medium flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm group" data-hint="Pinterest" title="Download Pinterest Videos & Idea Pins">
           <svg class="w-3.5 h-3.5 text-red-600 fill-current opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all" viewBox="0 0 24 24"><path d="M12 0a12 12 0 0 0-4.37 23.18c-.04-.98-.08-2.5.02-3.57.1-.98.63-4.24.63-4.24s-.16-.32-.16-.8c0-.75.44-1.31.98-1.31.46 0 .68.35.68.76 0 .47-.3 1.16-.45 1.8-.13.54.27.98.8.98 1 0 1.7-.1.35 1.7-2.35 0-1.28-.93-2.32-2.32-2.32-1.7 0-2.7 1.28-2.7 2.6 0 .52.2 1.07.45 1.37.05.06.06.12.04.18-.04.18-.14.58-.16.66-.03.1-.09.13-.2.08-.74-.35-1.2-1.43-1.2-2.3 0-1.87 1.36-3.6 3.92-3.6 2.06 0 3.66 1.47 3.66 3.43 0 2.05-1.29 3.7-3.08 3.7-.6 0-1.17-.31-1.36-.68l-.37 1.4c-.13.52-.49 1.17-.73 1.56A12.01 12.01 0 1 0 12 0z"/></svg>
           <span>Pinterest</span>
+        </button>
+        <button class="platform-chip platform-quick-btn px-2.5 py-1 rounded-lg bg-indigo-900/30 hover:bg-indigo-800/50 backdrop-blur-md border border-indigo-500/30 hover:border-indigo-400/60 text-indigo-300 hover:text-white text-[11px] font-bold flex items-center space-x-1.5 transition-all cursor-pointer shadow-sm group" data-hint="Web Video" title="Download Videos & Movies from Any Website, Portals & Direct HLS/M3U8 Streams">
+          <i data-lucide="globe" class="w-3.5 h-3.5 text-indigo-400 group-hover:text-white"></i>
+          <span>Web & Movie Sites</span>
         </button>
       </div>
     </div>
@@ -1208,7 +1212,7 @@
   </nav>
 
   <!-- Scripts -->
-  <script src="/js/app2.js?v=2.2.5"></script>
+  <script src="/js/app2.js?v=2.2.6"></script>
   <script>
     if (typeof lucide !== 'undefined' && lucide && typeof lucide.createIcons === 'function') {
       lucide.createIcons();
